@@ -58,7 +58,7 @@ makeSimpleStore dir state = do
   fp <- initializeDirectory dir
   _ <- attemptTakeLock fp
   let encodedState = S.encode state
-      checkpointPath = fp </> (fromText . pack $ (show initialVersion) ++ "checkpoint.st")
+      checkpointPath = fp </> (fromText . pack $ (show initialVersion) ++ (unpack checkpointBaseFileName))
       initialVersion = 0
   writeFile checkpointPath encodedState
   handle <- openFile checkpointPath ReadWriteMode

@@ -108,6 +108,8 @@ createStoreFromFilePath fp = do
                                            eVersion <*> 
                                            decode fConts
 
+checkpointBaseFileName = "checkpoint.st"
+
 -- | Create a checkpoint for a store. This attempts to write the state to disk
 -- If successful it updates the version, releases the old file handle, and deletes the old file
 checkpoint :: (Serialize st) => SimpleStore st -> IO (Either StoreError ())
@@ -116,17 +118,19 @@ checkpoint store = do
   state <- readTVarIO tState
   oldVersion <- readTVarIO tVersion
   let newVersion = (oldVersion + 1) `mod` 5
+      olderVersion = (oldVersion - 1) `mod` 5 -- Marked for deletion
       encodedState = encode state
-      oldCheckpointPath = fp </> fromText  ( Data.Text.append (pack . show $ oldVersion)  "checkpoint.st")
-      checkpointPath = fp </> fromText  ( Data.Text.append ( pack.show $ newVersion)  "checkpoint.st")
+--       oldCheckpointPath = fp </> fromText  ( Data.Text.append (pack . show $ oldVersion)  checkpointBaseFileName)
+      olderCheckpointPath = fp </> fromText  ( Data.Text.append (pack . show $ olderVersion)  checkpointBaseFileName)
+      checkpointPath = fp </> fromText  ( Data.Text.append ( pack.show $ newVersion)  checkpointBaseFileName)
   newHandle <- openFile checkpointPath ReadWriteMode
   eFileRes <- catch (Right <$> BS.hPut newHandle encodedState) (return . Left . catchStoreError)  
-  updateIfWritten oldCheckpointPath eFileRes newVersion newHandle
+  updateIfWritten olderCheckpointPath eFileRes newVersion newHandle
   where tState = storeState store
         tVersion = storeCheckpointVersion store
         tHandle = storeHandle store
         updateIfWritten _ l@(Left _) _ _= return l
-        updateIfWritten old _ version fHandle = do
+        updateIfWritten older _ version fHandle = do
           oHandle <- atomically $ do
             writeTVar tVersion version
             oldHandle <- takeTMVar tHandle
@@ -134,8 +138,10 @@ checkpoint store = do
             return oldHandle
           hClose oHandle    
           hFlush fHandle
-          removeFile old                
-          return . Right $ ()
+          yes <- isFile older
+          if yes
+            then removeFile older >> (return . Right) ()-- once removed file deletion                
+            else return . Right $ ()
 
 -- Initialize a directory by adding the working directory and checking if it already exists.
 -- If the folder already exists it deletes it and creates a new directory
