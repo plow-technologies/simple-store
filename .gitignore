@@ -8,3 +8,6 @@ cabal-dev
 .hsenv
 .cabal-sandbox/
 cabal.sandbox.config
+/TAGS
+/test-states/1checkpoint.st
+/test-states
