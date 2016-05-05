@@ -14,12 +14,24 @@ import           Data.Traversable
 -- import           Data.Traversable
 import           Filesystem
 import           Filesystem.Path
+import Filesystem.Path.CurrentOS (encodeString)  
 import           Prelude                      hiding (sequence)
 import           SimpleStore
 import           Test.Hspec
-
+import Data.List (sort,filter,reverse)
+import qualified System.IO  as System
 main :: IO ()
 main = hspec spec
+
+corruptOneState :: IO ()
+corruptOneState = do
+  let dir = "test-states"
+  lst <- listDirectory dir
+  putStrLn (show lst)
+  let (fp:sorted) = reverse.sort . filter (\fp -> fp /= "test-states/open.lock" ) $ lst
+  putStrLn (show fp)
+  System.writeFile (encodeString fp) "corrupt on purpose"
+
 
 makeTestStore = do 
    let x = 10 :: Int
@@ -45,7 +57,7 @@ spec = do
       -- workingDir <- getWorkingDirectory
       -- eStore <- makeSimpleStore dir x
       (eStore,dir,x,workingDir)  <- makeTestStore
-      sequence $ getSimpleStore <$> eStore
+      sequence $ getSimpleStore   <$> eStore
       sequence $ createCheckpoint <$> eStore
       sequence $ createCheckpoint <$> eStore
       sequence $ createCheckpoint <$> eStore
@@ -80,6 +92,7 @@ spec = do
         (Right store) -> do
           x' <- getSimpleStore store'
           removeTree $ workingDir </> dir
+          closeSimpleStore `traverse` eStore''
           x' `shouldBe` (modifyX initial)
   describe "Async updating/creating checkpoints for a state" $ do
     it "Should start 100 threads trying to update a state and should modify the state correctly, be able to close and reopen the state, and then read the correct value" $ do
@@ -103,6 +116,27 @@ spec = do
       eStore <- openSimpleStore dir
       let store' = either (error . show) id eStore
       x' <- getSimpleStore store'
+      closeSimpleStore `traverse` eStore
       x' `shouldBe` (200 :: Int)
-      
+  describe "purposefully corrupt file" $ do
+    it "Should corrupt a file and then open the old file and read it" $ do    
+          let dir = "test-states"
+          eStore <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))          
+          ex <- getSimpleStore `traverse` eStore
+          ey <- (flip modifySimpleStore (return . (1 +)) ) `traverse` eStore
+          _ <- closeSimpleStore `traverse` eStore
+          _ <- corruptOneState
+          eStore' <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))          
+          ex' <- getSimpleStore `traverse` eStore'          
+          closeSimpleStore `traverse` eStore'
+          putStrLn (show ex')
+          ex' `shouldBe` ex
+          (isRight ex') `shouldBe` (Right True) 
+            where
+              isRight (Right _) = Right True
+              isRight (Left s)  = Left s
+
+
+
+
 
