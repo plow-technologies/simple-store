@@ -1,8 +1,12 @@
 # Changelog
 
-# Last Updated 09-29-2014
+# Last Updated 05-05-2016
 
 Simple-Store
++ 1.0.0
+	We went down an odd path in 0.3.0 - 0.2.0
+	This restores order
+	
 + 0.1.4
   Better filename creation routine
   More strictness in the base types
