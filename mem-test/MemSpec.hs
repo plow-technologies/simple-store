@@ -34,11 +34,13 @@ instance Serialize TestNum where
 intList :: [TestNum]
 intList = TestNum <$> [0 .. 1000]
 
+testTreeDir = "xkcd-test-states"
+
 main :: IO () 
 main = do dataSet <- traverse makeTestStores  intList
           putStrLn "starting memory loop"
           _ <- traverse (\l -> forkIO (runMemTestLoop l ) ) dataSet           
-          removeTree "xkcd-test-states"
+          removeTree testTreeDir
           return ()
 
 
@@ -61,3 +63,4 @@ makeTestStores i = do
    workingDir <- getWorkingDirectory
    eStore <- makeSimpleStore dir i 
    return (eStore,dir,i,workingDir)
+
