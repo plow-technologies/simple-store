@@ -45,10 +45,12 @@ openSimpleStore fp = do
                                         t <- getModified file  -- Traverses the second item so sequence only evaluates
                                         return (t,file)        -- the second item
                                        ) files
-                        let sortedDates = snd <$> sortBy (compare `on` fst) modifiedDates
-                        openNewestStore createStoreFromFilePath sortedDates
+                        let sortedDates = snd <$> sortBy (compare `on` lexicalFirstChar) modifiedDates
+                        openNewestStore createStoreFromFilePath (Prelude.reverse sortedDates)
                 else return . Left $ StoreLocked
      else return . Left $ StoreFolderNotFound
+ where
+   lexicalFirstChar (_,j) = Prelude.take 1 . encodeString $ j
 
 -- | Initialize a simple store from a given filepath and state.
 -- The filepath should just be to the directory you want the state created in

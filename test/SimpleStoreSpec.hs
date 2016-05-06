@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module SimpleStoreSpec (main
                        , spec
                        , makeTestStore) where
@@ -18,8 +19,28 @@ import Filesystem.Path.CurrentOS (encodeString)
 import           Prelude                      hiding (sequence)
 import           SimpleStore
 import           Test.Hspec
-import Data.List (sort,filter,reverse)
+import Data.List (sort,filter,reverse,sortBy)
 import qualified System.IO  as System
+import Data.Function 
+
+import qualified Data.Serialize               as S
+
+
+
+-- | Bound int allows failure when reading back corrupted data
+newtype BoundInt = BoundInt Int
+ deriving (Num ,Eq,Show,Ord)
+
+
+instance S.Serialize BoundInt where
+  put (BoundInt i) = S.put i
+  get = S.get >>= failOnBig
+    where
+      failOnBig i
+        | i > 10000 = fail "int too big "
+        | otherwise = return $ BoundInt i
+
+
 main :: IO ()
 main = hspec spec
 
@@ -28,7 +49,12 @@ corruptOneState = do
   let dir = "test-states"
   lst <- listDirectory dir
   putStrLn (show lst)
-  let (fp:sorted) = reverse.sort . filter (\fp -> fp /= "test-states/open.lock" ) $ lst
+  let (fp:sorted) = sortBy (compare `on` lexicalFirstChar) $
+                    filter (\fp -> fp /= "test-states/open.lock" ) $ lst
+                    
+      lexicalFirstChar j = Prelude.take 1 . encodeString $ j
+
+      
   putStrLn (show fp)
   System.writeFile (encodeString fp) "corrupt on purpose"
 
@@ -118,15 +144,32 @@ spec = do
       x' <- getSimpleStore store'
       closeSimpleStore `traverse` eStore
       x' `shouldBe` (200 :: Int)
+  describe "test ordered state file" $ do
+    it "should make sure the right file is being opened" $ do
+      let dir = "test-states"
+      eStore <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))          
+      ex <- getSimpleStore `traverse` eStore
+      _ <- (flip modifySimpleStore (return . (1 +)) ) `traverse` eStore
+      _ <- createCheckpoint `traverse` eStore
+      ey <- getSimpleStore `traverse` eStore      
+      _ <- closeSimpleStore `traverse` eStore
+      eStore' <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))          
+      ex' <- getSimpleStore `traverse` eStore'          
+      closeSimpleStore `traverse` eStore'
+      putStrLn (show ex')
+      (isRight ex') `shouldBe` (Right True) 
+      ex' `shouldBe` ey
+
   describe "purposefully corrupt file" $ do
     it "Should corrupt a file and then open the old file and read it" $ do    
           let dir = "test-states"
-          eStore <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))          
+          eStore <- openSimpleStore dir :: IO (Either StoreError (SimpleStore (BoundInt)))          
           ex <- getSimpleStore `traverse` eStore
-          ey <- (flip modifySimpleStore (return . (1 +)) ) `traverse` eStore
+          _ <- (flip modifySimpleStore (return . (1 +)) ) `traverse` eStore
+          _ <- createCheckpoint `traverse` eStore
           _ <- closeSimpleStore `traverse` eStore
           _ <- corruptOneState
-          eStore' <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))          
+          eStore' <- openSimpleStore dir :: IO (Either StoreError (SimpleStore BoundInt))          
           ex' <- getSimpleStore `traverse` eStore'          
           closeSimpleStore `traverse` eStore'
           putStrLn (show ex')
