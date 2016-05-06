@@ -53,7 +53,6 @@ corruptOneState = do
                     filter (\fp -> fp /= "test-states/open.lock" ) $ lst
                     
       lexicalFirstChar j = Prelude.take 1 . encodeString $ j
-
       
   putStrLn (show fp)
   System.writeFile (encodeString fp) "corrupt on purpose"
