@@ -45,7 +45,7 @@ openSimpleStore fp = do
                                         t <- getModified file  -- Traverses the second item so sequence only evaluates
                                         return (t,file)        -- the second item
                                        ) files
-                        let sortedDates = snd <$> sortBy (compare `on` snd) modifiedDates
+                        let sortedDates = snd <$> sortBy (compare `on` fst) modifiedDates
                         openNewestStore createStoreFromFilePath sortedDates
                 else return . Left $ StoreLocked
      else return . Left $ StoreFolderNotFound
@@ -58,11 +58,13 @@ makeSimpleStore dir state = do
   fp <- initializeDirectory dir
   _ <- attemptTakeLock fp
   let encodedState = S.encode state
-      checkpointPath = fp </> (fromText . pack $ (show initialVersion) ++ (unpack checkpointBaseFileName))
+      checkpointPath = fp </> (fromText . pack $ (show $ 1 + initialVersion) ++ (unpack checkpointBaseFileName))
+      checkpointPathBackup  = fp </> (fromText . pack $ (show $ initialVersion) ++ (unpack checkpointBaseFileName)) -- we write a backup immediately
       initialVersion = 0
   writeFile checkpointPath encodedState
+  writeFile checkpointPathBackup encodedState  
   handle <- openFile checkpointPath ReadWriteMode
-  Right <$> createStore fp handle initialVersion state
+  Right <$> createStore fp handle (1 + initialVersion) state
 
 
 -- | Attempt to open a store. If the store doesn't it exist it will create the store in the filepath given
