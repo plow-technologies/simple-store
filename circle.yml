@@ -1,17 +1,31 @@
 machine:
+  pre:
+    - sudo add-apt-repository ppa:hvr/ghc -y
+    - sudo apt-get update
+    - sudo apt-get install gcc-4.8
+    - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 90
+    - gcc --version
   ghc:
     version: 7.10.2
 
   environment:
-    PATH: $HOME/.cabal/bin:$CIRCLE_ARTIFACTS:$PATH/$HOME/simple-store/.cabal-sandbox/bin
+    PATH: /opt/ghc/7.10.3/bin/:$HOME/.cabal/bin:$CIRCLE_ARTIFACTS:$PATH/$HOME/simple-store/.cabal-sandbox/bin
 
 dependencies:
   cache_directories:
     - "~/.cabal"
     - "~/simple-store/.cabal-sandbox"
     - "~/simple-store/dist"
+    - "~/ghc"
   override:
-    - "if [ ! -f /home/ubuntu/.cabal/config ]; then cabal update && echo remote-repo: hackage.plowtech.net:http://hackage.plowtech.net/packages/archive >> ~/.cabal/config; else echo .cabal/config file already exists; fi"
+    - if [ -d ~/ghc ]; then sudo cp -r ~/ghc /opt; fi
+    - if ghc --version | grep 7.10.3; then echo "Version 7.10.3"; else sudo apt-get install ghc-7.10.3 ghc-7.10.3-prof -y && 
+       sudo cp -r /opt/ghc 
+       $HOME/ghc && echo "copy complete" ; fi
+    - ghc --version
+    - if cabal --version | grep 1.23.0.0; then echo "Version 1.23.0.0"; else cd ~/ && git clone https://github.com/plow-technologies/cabal.git && cd cabal && cabal --no-require-sandbox install -j2 Cabal/ cabal-install/; fi
+    - git clone git@github.com:plow-technologies/plow-scripts.git
+    - cp plow-scripts/config $HOME/.cabal/config
     - cabal update
     - cabal sandbox init
     - cabal install
