@@ -161,7 +161,7 @@ spec = do
 
   describe "purposefully corrupt file" $ do
     it "Should corrupt a file and then open the old file and read it" $ do    
-          let dir = "test-states"
+          let dir = "test-states"          
           eStore <- openSimpleStore dir :: IO (Either StoreError (SimpleStore (BoundInt)))          
           ex <- getSimpleStore `traverse` eStore
           _ <- (flip modifySimpleStore (return . (1 +)) ) `traverse` eStore
