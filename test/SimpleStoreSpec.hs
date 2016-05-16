@@ -55,8 +55,11 @@ corruptOneState = do
       lexicalFirstChar j = Prelude.take 1 . encodeString $ j
       
   putStrLn (show fp)
-  System.writeFile (encodeString fp) "corrupt on purpose"
-
+  System.writeFile (encodeString .  handleFpAt4 $ fp) "corrupt on purpose"
+ where
+   handleFpAt4 fp = if fp == "test-states/4checkpoint.st"
+                       then "test-states/0checkpoint.st"
+                       else fp
 
 makeTestStore = do 
    let x = 10 :: Int
