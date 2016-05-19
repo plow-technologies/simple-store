@@ -3,6 +3,8 @@
 # Last Updated 05-05-2016
 
 Simple-Store
++ 1.1.0
+   removeTree fp, removed!
 + 1.0.0
 	We went down an odd path in 0.3.0 - 0.2.0
 	This restores order

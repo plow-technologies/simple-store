@@ -37,12 +37,13 @@ instance S.Serialize BoundInt where
   get = S.get >>= failOnBig
     where
       failOnBig i
-        | i > 10000 = fail "int too big "
+        | i > 10000 = fail "int too big to fail "
         | otherwise = return $ BoundInt i
 
 
 main :: IO ()
-main = hspec spec
+main = do  
+  hspec spec
 
 corruptOneState :: IO ()
 corruptOneState = do
@@ -78,8 +79,10 @@ makeTestTextStore = do
 
 spec :: Spec
 spec = do
-  describe "Making, creating checkpoints, closing, reopening" $ do
+  
+  describe "Making, creating checkpoints, closing, reopening" $ do    
     it "should open an initial state, create checkpoints, and then open the state back up" $ do
+      removeTree "test-states"
       -- let x = 10 :: Int
       --     dir = "test-states"
       -- workingDir <- getWorkingDirectory

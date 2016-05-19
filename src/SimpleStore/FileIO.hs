@@ -108,6 +108,7 @@ createStoreFromFilePath fp = do
                                            eVersion <*> 
                                            decode fConts
 
+
 checkpointBaseFileName = "checkpoint.st"
 
 -- | Create a checkpoint for a store. This attempts to write the state to disk
@@ -149,7 +150,7 @@ initializeDirectory :: FilePath -> IO FilePath
 initializeDirectory dir = do
   fp <- makeAbsoluteFp dir
   exists <- isDirectory fp
-  when exists $ removeTree fp
+  when exists $ fail (show fp ++ "exists already, failing") 
   createDirectory True fp
   return fp
 
