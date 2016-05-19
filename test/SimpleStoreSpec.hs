@@ -82,7 +82,11 @@ spec = do
   
   describe "Making, creating checkpoints, closing, reopening" $ do    
     it "should open an initial state, create checkpoints, and then open the state back up" $ do
-      removeTree "test-states"
+      r <- isDirectory "test-states"
+      if r
+         then removeTree "test-states"
+         else return ()
+
       -- let x = 10 :: Int
       --     dir = "test-states"
       -- workingDir <- getWorkingDirectory
