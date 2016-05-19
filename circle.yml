@@ -40,8 +40,8 @@ test:
     - cabal test --show-details=always -j2:
         timeout: 3000
 
-# deployment:
-#   staging:
-#     branch: master
-#     commands:
-#       - ./deploy_staging.sh
+deployment:
+  staging:
+    branch: master
+    commands:
+      - sh plow-scripts/hackage.sh
