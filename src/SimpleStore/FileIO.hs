@@ -1,6 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-
+{-# LANGUAGE BangPatterns #-}
 module SimpleStore.FileIO where
 
 import           Control.Applicative
@@ -26,7 +26,7 @@ import           System.Posix.Process
 -- | Return the given filepath if it is able to break the open.lock file
 ableToBreakLock :: FilePath -> IO (Either StoreError FilePath)
 ableToBreakLock fp = do
-  fileExists <- isFile fp
+  !fileExists <- isFile fp
   if fileExists
      then do
        ePid <- readMay <$> readFile (encodeString fp) :: IO (Maybe Int)
@@ -115,17 +115,17 @@ checkpointBaseFileName = "checkpoint.st"
 -- If successful it updates the version, releases the old file handle, and deletes the old file
 checkpoint :: (Serialize st) => SimpleStore st -> IO (Either StoreError ())
 checkpoint store = do
-  fp <- readTVarIO . storeDir $ store
-  state <- readTVarIO tState
-  oldVersion <- readTVarIO tVersion
-  let newVersion = (oldVersion + 1) `mod` 5
-      olderVersion = (oldVersion - 1) `mod` 5 -- Marked for deletion
-      encodedState = encode state
+  !fp <- readTVarIO . storeDir $ store
+  !state <- readTVarIO tState
+  !oldVersion <- readTVarIO tVersion
+  let !newVersion = (oldVersion + 1) `mod` 5
+      !olderVersion = (oldVersion - 1) `mod` 5 -- Marked for deletion
+      !encodedState = encode state
 --       oldCheckpointPath = fp </> fromText  ( Data.Text.append (pack . show $ oldVersion)  checkpointBaseFileName)
       olderCheckpointPath = fp </> fromText  ( Data.Text.append (pack . show $ olderVersion)  checkpointBaseFileName)
       checkpointPath = fp </> fromText  ( Data.Text.append ( pack.show $ newVersion)  checkpointBaseFileName)
   newHandle <- openFile checkpointPath ReadWriteMode
-  eFileRes <- catch (Right <$> BS.hPut newHandle encodedState) (return . Left . catchStoreError)  
+  !eFileRes <- catch (Right <$> BS.hPut newHandle encodedState) (return . Left . catchStoreError)  
   updateIfWritten olderCheckpointPath eFileRes newVersion newHandle
   where tState = storeState store
         tVersion = storeCheckpointVersion store
