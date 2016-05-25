@@ -3,6 +3,8 @@
 # Last Updated 05-05-2016
 
 Simple-Store
++ 1.1.1
+   strictness annotation on checkpoint creation
 + 1.1.0
    removeTree fp, removed!
 + 1.0.0
