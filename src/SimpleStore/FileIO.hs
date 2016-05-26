@@ -92,8 +92,6 @@ catchStoreError e
 openNewestStore :: (FilePath -> IO (Either StoreError b)) -> [FilePath] -> IO (Either StoreError b)
 openNewestStore _ [] = return . Left $ StoreFileNotFound
 openNewestStore f (x:xs) = do
-  putStrLn $  "here is your god damn file: "  ++ (show x)
-  putStrLn $  "here was the rest " ++ (show xs)
   res <- catch (f x) (hIOException f xs)
   case res of
     Left _ -> openNewestStore f xs
@@ -145,8 +143,7 @@ checkpoint store = do
       checkpointPath      = fp </> fromText  newFileName
 
 
-  putStrLn  $  "new fp: " ++ (show      checkpointPath)
-  putStrLn  $  "state: " ++ (show encodedState)
+
   newHandle <- openFile checkpointPath WriteMode
   Text.writeFile (encodeString $ fp </> "last.touch")  (pack.encodeString $ checkpointPath)
   !eFileRes <- catch (Right <$> BS.hPut newHandle encodedState)

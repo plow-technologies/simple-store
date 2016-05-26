@@ -6,7 +6,7 @@ module SimpleStoreSpec (main
                        , makeTestStore) where
 
 import           Control.Applicative
--- import           Control.Concurrent
+import           Control.Concurrent (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.STM
 -- import           Control.Concurrent.STM.TMVar
@@ -186,6 +186,7 @@ spec = do
           eStore <- openSimpleStore dir :: IO (Either StoreError (SimpleStore (BoundInt)))          
           ex <- getSimpleStore `traverse` eStore
           _ <- (flip modifySimpleStore (return . (1 +)) ) `traverse` eStore
+          _ <- threadDelay (70 * 10^6)
           _ <- createCheckpoint `traverse` eStore
           _ <- closeSimpleStore `traverse` eStore
           _ <- corruptOneState

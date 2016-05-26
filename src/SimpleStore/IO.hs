@@ -57,7 +57,6 @@ openSimpleStore fp = do
                         let
                           times = utcTimeToPOSIXSeconds . fst <$> modifiedDates
                           sortedDates = snd <$> sortBy (compare `on` fst) modifiedDates
-                        putStrLn $ "Here are the files with modified times" ++ (show times)
                         if lastTouchExists 
                         then  do
                          fpExpected <- Text.readFile $ encodeString $  lastTouch
