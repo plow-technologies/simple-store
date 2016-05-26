@@ -11,6 +11,7 @@ import           Data.List
 import qualified Data.Serialize               as S
 import           Data.Text                    hiding (filter, foldl, map,
                                                maximum, stripPrefix)
+import qualified Data.Text.IO as Text                 
 import           Data.Traversable
 import           Filesystem
 import           Filesystem.Path
@@ -21,6 +22,8 @@ import           SimpleStore.FileIO
 import           SimpleStore.Internal
 import           SimpleStore.Types
 import Data.Either
+import Data.Time.Clock.POSIX 
+
 
 -- | Get the current value of the store
 getSimpleStore :: SimpleStore st -> IO st
@@ -31,6 +34,9 @@ putSimpleStore :: SimpleStore st -> st -> IO ()
 putSimpleStore store state = withLock store $ putWriteStore store state
 
 -- | Open a simple store from a filepath reading in the newest most valid store
+-- important to the operation of this is the last.touch file.
+-- this file tells openSimpleStore where to try and open first.
+-- it is plain text encoded and updated on every checkpoint.
 openSimpleStore :: S.Serialize st => FilePath -> IO (Either StoreError (SimpleStore st))
 openSimpleStore fp = do
   dir <- makeAbsoluteFp fp
@@ -39,19 +45,30 @@ openSimpleStore fp = do
      then do lock <- attemptTakeLock fp
              if isRight lock
                 then do dirContents <- listDirectory dir
+                        let lastTouch = (dir </> "last.touch")
+                        lastTouchExists <- isFile lastTouch                        
                         let files = filter isState dirContents
                         modifiedDates <-
                            traverse (\file -> do               -- Lambda is because the instance for Traversable on ()
                                         t <- getModified file  -- Traverses the second item so sequence only evaluates
-                                        return (t,file)        -- the second item
-                                       ) files
-                        let sortedDates = snd <$> sortBy (compare `on` lexicalFirstChar) modifiedDates
-                        openNewestStore createStoreFromFilePath (Prelude.reverse sortedDates)
+                                        
+                                        return (t,file)        -- the second item                                        
+                                       ) files                         
+                        let
+                          times = utcTimeToPOSIXSeconds . fst <$> modifiedDates
+                          sortedDates = snd <$> sortBy (compare `on` fst) modifiedDates
+                        putStrLn $ "Here are the files with modified times" ++ (show times)
+                        if lastTouchExists 
+                        then  do
+                         fpExpected <- Text.readFile $ encodeString $  lastTouch
+                         openNewestStore createStoreFromFilePath ((fromText fpExpected) : Prelude.reverse sortedDates)
+                        else
+                          openNewestStore createStoreFromFilePath ( Prelude.reverse sortedDates)
                 else return . Left $ StoreLocked
      else return . Left $ StoreFolderNotFound
- where
-   lexicalFirstChar (_,j) = Prelude.take 1 . encodeString $ j
 
+
+   
 -- | Initialize a simple store from a given filepath and state.
 -- The filepath should just be to the directory you want the state created in
 -- as in "state"
@@ -61,7 +78,8 @@ makeSimpleStore dir state = do
   _ <- attemptTakeLock fp
   let encodedState = S.encode state
       checkpointPath = fp </> (fromText . pack $ (show $ 1 + initialVersion) ++ (unpack checkpointBaseFileName))
-      checkpointPathBackup  = fp </> (fromText . pack $ (show $ initialVersion) ++ (unpack checkpointBaseFileName)) -- we write a backup immediately
+      checkpointPathBackup  = fp </> (fromText . pack $ (show $ initialVersion) ++
+                                                        (unpack checkpointBaseFileName)) -- we write a backup immediately
       initialVersion = 0
   writeFile checkpointPath encodedState
   writeFile checkpointPathBackup encodedState  

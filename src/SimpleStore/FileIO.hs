@@ -11,6 +11,7 @@ import           Data.Bifunctor
 import qualified Data.ByteString           as BS
 import           Data.Serialize
 import           Data.Text
+import qualified Data.Text.IO as Text
 import           Data.Traversable
 import           Filesystem                hiding (readFile, writeFile)
 import           Filesystem.Path
@@ -88,14 +89,18 @@ catchStoreError e
   | otherwise = StoreIOError . show $ e
 
 -- | Opens the newest store that doesn't throw an exception or give a StoreError back as a result
-openNewestStore :: (a -> IO (Either StoreError b)) -> [a] -> IO (Either StoreError b)
+openNewestStore :: (FilePath -> IO (Either StoreError b)) -> [FilePath] -> IO (Either StoreError b)
 openNewestStore _ [] = return . Left $ StoreFileNotFound
 openNewestStore f (x:xs) = do
+  putStrLn $  "here is your god damn file: "  ++ (show x)
+  putStrLn $  "here was the rest " ++ (show xs)
   res <- catch (f x) (hIOException f xs)
   case res of
     Left _ -> openNewestStore f xs
-    _ -> return res
-  where  hIOException :: (a -> IO (Either StoreError b)) -> [a] -> IOException -> IO (Either StoreError b)
+    _ -> do
+      
+      return res
+  where  hIOException :: (FilePath -> IO (Either StoreError b)) -> [FilePath] -> IOException -> IO (Either StoreError b)
          hIOException func ys _ = openNewestStore func ys
 
 -- Attempt to open a store from a filepath
@@ -109,40 +114,69 @@ createStoreFromFilePath fp = do
                                            decode fConts
 
 
+checkpointBaseFileName :: Text
 checkpointBaseFileName = "checkpoint.st"
+
+
+
+
+
 
 -- | Create a checkpoint for a store. This attempts to write the state to disk
 -- If successful it updates the version, releases the old file handle, and deletes the old file
 checkpoint :: (Serialize st) => SimpleStore st -> IO (Either StoreError ())
 checkpoint store = do
-  !fp <- readTVarIO . storeDir $ store
-  !state <- readTVarIO tState
+  
+  !fp         <- readTVarIO . storeDir $ store
+  !state      <- readTVarIO tState
   !oldVersion <- readTVarIO tVersion
-  let !newVersion = (oldVersion + 1) `mod` 5
-      !olderVersion = (oldVersion - 1) `mod` 5 -- Marked for deletion
-      !encodedState = encode state
---       oldCheckpointPath = fp </> fromText  ( Data.Text.append (pack . show $ oldVersion)  checkpointBaseFileName)
-      olderCheckpointPath = fp </> fromText  ( Data.Text.append (pack . show $ olderVersion)  checkpointBaseFileName)
-      checkpointPath = fp </> fromText  ( Data.Text.append ( pack.show $ newVersion)  checkpointBaseFileName)
-  newHandle <- openFile checkpointPath ReadWriteMode
-  !eFileRes <- catch (Right <$> BS.hPut newHandle encodedState) (return . Left . catchStoreError)  
-  updateIfWritten olderCheckpointPath eFileRes newVersion newHandle
-  where tState = storeState store
-        tVersion = storeCheckpointVersion store
-        tHandle = storeHandle store
-        updateIfWritten _ l@(Left _) _ _= return l
-        updateIfWritten older _ version fHandle = do
-          oHandle <- atomically $ do
-            writeTVar tVersion version
-            oldHandle <- takeTMVar tHandle
-            putTMVar tHandle fHandle
-            return oldHandle
-          hClose oHandle    
-          hFlush fHandle
-          yes <- isFile older
-          if yes
-            then removeFile older >> (return . Right) ()-- once removed file deletion                
-            else return . Right $ ()
+
+  let !newVersion         = (oldVersion + 1) `mod` 5
+      !olderVersion       = (oldVersion - 1) `mod` 5 -- Marked for deletion
+      !encodedState       = encode state
+
+      oldFileName         = ( Data.Text.append ( pack . show $ olderVersion )
+                                                 checkpointBaseFileName     )
+                            
+      olderCheckpointPath = fp </> fromText  oldFileName
+      
+      newFileName         =  ( Data.Text.append ( pack.show   $ newVersion )
+                                                  checkpointBaseFileName   )                    
+      checkpointPath      = fp </> fromText  newFileName
+
+
+  putStrLn  $  "new fp: " ++ (show      checkpointPath)
+  putStrLn  $  "state: " ++ (show encodedState)
+  newHandle <- openFile checkpointPath WriteMode
+  Text.writeFile (encodeString $ fp </> "last.touch")  (pack.encodeString $ checkpointPath)
+  !eFileRes <- catch (Right <$> BS.hPut newHandle encodedState)
+                     (return . Left . catchStoreError)
+               
+  updateIfWritten eFileRes newVersion newHandle  
+    where
+      
+          tState   = storeState             store
+          tVersion = storeCheckpointVersion store
+          tHandle  = storeHandle            store
+
+          updateIfWritten  l@(Left _) _       _       = return l
+          updateIfWritten  _          version fHandle = do
+            oHandle <- atomically $ do            
+                         _         <- writeTVar tVersion version
+                         oldHandle <- takeTMVar tHandle
+                         _         <- putTMVar  tHandle fHandle
+                         return oldHandle
+
+            _       <- hClose oHandle    
+            _       <- hFlush fHandle
+            return $ Right ()
+
+
+
+
+
+
+
 
 -- Initialize a directory by adding the working directory and checking if it already exists.
 -- If the folder already exists it deletes it and creates a new directory
@@ -153,6 +187,12 @@ initializeDirectory dir = do
   when exists $ fail (show fp ++ "exists already, failing") 
   createDirectory True fp
   return fp
+
+
+
+
+
+
 
 makeAbsoluteFp :: FilePath -> IO FilePath
 makeAbsoluteFp fp = do

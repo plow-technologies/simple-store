@@ -49,14 +49,14 @@ corruptOneState :: IO ()
 corruptOneState = do
   let dir = "test-states"
   lst <- listDirectory dir
-  putStrLn (show lst)
+--  putStrLn (show lst)
   let (fp:sorted) = sortBy (compare `on` lexicalFirstChar) $
                     filter (\fp -> fp /= "test-states/open.lock" ) $ lst
                     
       lexicalFirstChar j = Prelude.take 1 . encodeString $ j
       
   putStrLn (show fp)
-  System.writeFile (encodeString .  handleFpAt4 $ fp) "corrupt on purpose"
+  System.writeFile (encodeString $ fp) "corrupt on purpose"
  where
    handleFpAt4 fp = if fp == "test-states/4checkpoint.st"
                        then "test-states/0checkpoint.st"
@@ -131,28 +131,39 @@ spec = do
           x' `shouldBe` (modifyX initial)
   describe "Async updating/creating checkpoints for a state" $ do
     it "Should start 100 threads trying to update a state and should modify the state correctly, be able to close and reopen the state, and then read the correct value" $ do
-      let initial = 0 :: Int
-          modifyX = (+2)
-          dir = "test-states"
-          functions = replicate 100  (\tv x -> (atomically $ readTMVar tv) >> (return . modifyX $ x))
+      let
+        initial = 0 :: Int
+        initialString = show initial 
+        modifyX = (+ 2)
+        dir = "test-states"
+        functions = replicate 100  (\tv x -> (atomically $ readTMVar tv) >>
+                                             (return . show . modifyX . read $ x)         )
+
+
       waitTVar <- newEmptyTMVarIO
-      (Right store) <- makeSimpleStore dir initial
-      
+      (Right store) <- makeSimpleStore dir initialString
+
       createCheckpoint store
+
+      
       aRes <- traverse (\func -> async $ do
                           modifySimpleStore store (func waitTVar)
-                          createCheckpoint store) functions
+                          createCheckpoint store) functions :: IO [Async (Either StoreError ())]
+                                                            
       atomically $ putTMVar waitTVar ()
       results <- traverse wait aRes
-      x'' <- getSimpleStore store
+      
+      x'' <- getSimpleStore store      
       putStrLn $ "x -> " ++ (show x'')
       createCheckpoint store
       closeSimpleStore store
+     
       eStore <- openSimpleStore dir
       let store' = either (error . show) id eStore
       x' <- getSimpleStore store'
+      putStrLn $ "x' -> " ++ (show x')
       closeSimpleStore `traverse` eStore
-      x' `shouldBe` (200 :: Int)
+      x' `shouldBe` ("200" :: String)
   describe "test ordered state file" $ do
     it "should make sure the right file is being opened" $ do
       let dir = "test-states"

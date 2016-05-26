@@ -3,6 +3,12 @@
 # Last Updated 05-05-2016
 
 Simple-Store
++ 2.0.1
+   last touch not present shouldn't throw exception
++ 2.0.0
+   simple-store now uses a last touch file to determine the correct file to decode
++ 1.2.0
+   stop deleting, only rewriting
 + 1.1.1
    strictness annotation on checkpoint creation
 + 1.1.0
