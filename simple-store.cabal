@@ -32,6 +32,7 @@ Library
                       , safe >= 0.3.8
                       , bifunctors >= 4.2
                       , time >= 1.4.2
+                      , async
 
 Test-Suite spec
   Type:                 exitcode-stdio-1.0
