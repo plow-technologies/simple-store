@@ -59,6 +59,7 @@ openSimpleStore fp = do
                         let
                           times = utcTimeToPOSIXSeconds . fst <$> modifiedDates
                           sortedDates = snd <$> sortBy (compare `on` fst) modifiedDates
+                        putStrLn "last touch"
                         if lastTouchExists 
                         then  do
                          (_, fpExpected) <- do
@@ -80,12 +81,9 @@ openSimpleStore fp = do
 
                                   asyncLastTouch   <- async readLastTouch
                                   asyncDefaultToNewest <- async $ (threadDelay (3 * 10^6 ) >> defaultToNewest)
-                                  waitAny [asyncLastTouch, asyncDefaultToNewest]
-                         
-
-
-
-
+                                  waitAny [asyncLastTouch, asyncDefaultToNewest]                         
+                                  
+                         putStrLn $ "file path: " ++ (show fpExpected)
                          openNewestStore createStoreFromFilePath ((fpExpected) : Prelude.reverse sortedDates)
                         else
                           openNewestStore createStoreFromFilePath ( Prelude.reverse sortedDates)
