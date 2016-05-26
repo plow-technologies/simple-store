@@ -18,6 +18,8 @@ import           Filesystem.Path
 import           Filesystem.Path.CurrentOS    hiding (decode)
 import           Prelude                      hiding (FilePath, sequence,
                                                writeFile)
+import Control.Concurrent.Async
+import Control.Concurrent 
 import           SimpleStore.FileIO
 import           SimpleStore.Internal
 import           SimpleStore.Types
@@ -59,8 +61,24 @@ openSimpleStore fp = do
                           sortedDates = snd <$> sortBy (compare `on` fst) modifiedDates
                         if lastTouchExists 
                         then  do
-                         fpExpected <- Text.readFile $ encodeString $  lastTouch
-                         openNewestStore createStoreFromFilePath ((fromText fpExpected) : Prelude.reverse sortedDates)
+                         (_, fpExpected) <- do
+                                  let readLastTouch = (fmap fromText . Text.readFile $ encodeString $  lastTouch)
+                                      defaultToNewest :: IO FilePath
+                                      defaultToNewest 
+                                        | Prelude.null sortedDates = fail "no state file found"
+                                        | otherwise =  return $ Prelude.head $ Prelude.reverse $ sortedDates
+
+
+
+                                  asyncLastTouch   <- async readLastTouch
+                                  asyncDefaultToNewest <- async $ (threadDelay (3 * 10^6 ) >> defaultToNewest)
+                                  waitAny [asyncLastTouch, asyncDefaultToNewest]
+                         
+
+
+
+
+                         openNewestStore createStoreFromFilePath ((fpExpected) : Prelude.reverse sortedDates)
                         else
                           openNewestStore createStoreFromFilePath ( Prelude.reverse sortedDates)
                 else return . Left $ StoreLocked

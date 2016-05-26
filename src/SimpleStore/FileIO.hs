@@ -24,6 +24,7 @@ import           System.IO                 (hClose,hFlush)
 import           System.IO.Error
 import           System.Posix.Process
 
+
 -- | Return the given filepath if it is able to break the open.lock file
 ableToBreakLock :: FilePath -> IO (Either StoreError FilePath)
 ableToBreakLock fp = do
@@ -100,7 +101,7 @@ openNewestStore f (x:xs) = do
       return res
   where  hIOException :: (FilePath -> IO (Either StoreError b)) -> [FilePath] -> IOException -> IO (Either StoreError b)
          hIOException func ys _ = openNewestStore func ys
-
+n
 -- Attempt to open a store from a filepath
 createStoreFromFilePath :: (Serialize st) => FilePath -> IO (Either StoreError (SimpleStore st))
 createStoreFromFilePath fp = do
