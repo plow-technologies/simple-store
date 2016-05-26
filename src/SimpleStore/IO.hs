@@ -67,17 +67,16 @@ openSimpleStore fp = do
                                       defaultToNewest :: IO FilePath
                                       defaultToNewest 
                                         | Prelude.null sortedDates = fail "no state file found"
-                                        | otherwise =  return $ Prelude.head $ Prelude.reverse $ sortedDates
+                                        | otherwise =  (putStrLn "default to newest") >> (return $ Prelude.head $ Prelude.reverse $ sortedDates)
                                       readLastTouch = do 
                                          fpTxt <- Text.readFile $ encodeString $  lastTouch
                                          let fpInLastTouch = fromText fpTxt
+                                         putStrLn "last touch read"
                                          rslt <- isFile fpInLastTouch
                                          if rslt
                                             then return fpInLastTouch
                                             else fail "last.touch appears corrupted"
                                   
-
-
 
                                   asyncLastTouch   <- async readLastTouch
                                   asyncDefaultToNewest <- async $ (threadDelay (3 * 10^6 ) >> defaultToNewest)
