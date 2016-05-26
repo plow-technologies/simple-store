@@ -62,11 +62,19 @@ openSimpleStore fp = do
                         if lastTouchExists 
                         then  do
                          (_, fpExpected) <- do
-                                  let readLastTouch = (fmap fromText . Text.readFile $ encodeString $  lastTouch)
+                                  let 
                                       defaultToNewest :: IO FilePath
                                       defaultToNewest 
                                         | Prelude.null sortedDates = fail "no state file found"
                                         | otherwise =  return $ Prelude.head $ Prelude.reverse $ sortedDates
+                                      readLastTouch = do 
+                                         fpTxt <- Text.readFile $ encodeString $  lastTouch
+                                         let fpInLastTouch = fromText fpTxt
+                                         rslt <- isFile fpInLastTouch
+                                         if rslt
+                                            then return fpInLastTouch
+                                            else fail "last.touch appears corrupted"
+                                  
 
 
 
