@@ -21,8 +21,9 @@ import           SimpleStore
 import           Test.Hspec
 import Data.List (sort,filter,reverse,sortBy)
 import qualified System.IO  as System
-import Data.Function 
-
+import Data.Function
+import qualified Data.Text as Text
+import qualified Data.Text.IO as Text
 import qualified Data.Serialize               as S
 
 
@@ -50,13 +51,15 @@ corruptOneState = do
   let dir = "test-states"
   lst <- listDirectory dir
 --  putStrLn (show lst)
+  
   let (fp:sorted) = sortBy (compare `on` lexicalFirstChar) $
                     filter (\fp -> fp /= "test-states/open.lock" ) $ lst
                     
       lexicalFirstChar j = Prelude.take 1 . encodeString $ j
       
   putStrLn (show fp)
-  System.writeFile (encodeString $ fp) "corrupt on purpose"
+  val <-  Text.readFile "test-states/last.touch"
+  System.writeFile (Text.unpack val) "corrupt on purpose"
  where
    handleFpAt4 fp = if fp == "test-states/4checkpoint.st"
                        then "test-states/0checkpoint.st"
