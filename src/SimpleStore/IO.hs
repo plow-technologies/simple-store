@@ -67,8 +67,10 @@ openSimpleStore fp = do
                         then  do
                          (_, fpExpected) <- do
                                   let defaultToNewest :: IO FilePath
-                                      defaultToNewest | Prelude.null sortedDates = fail "no state file found"
-                                      defaultToNewest = pure $ last sortedDates
+                                      defaultToNewest =
+                                        if Prelude.null sortedDates
+                                           then fail "no state file found"
+                                           else pure $ Prelude.last sortedDates
                                   
                                   -- Read the file exception-free
                                   let strfp = encodeString lastTouch
