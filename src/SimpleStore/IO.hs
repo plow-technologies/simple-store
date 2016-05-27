@@ -6,12 +6,15 @@ import           Control.Applicative
 import           Control.Concurrent.STM.TVar
 import           Control.Monad                hiding (sequence)
 import           Control.Monad.STM
+import           Control.Exception (SomeException, try)
 import           Data.Function
 import           Data.List
 import qualified Data.Serialize               as S
 import           Data.Text                    hiding (filter, foldl, map,
                                                maximum, stripPrefix)
 import qualified Data.Text.IO as Text                 
+import Data.Text.Encoding (decodeUtf8')
+import qualified Data.ByteString as B
 import           Data.Traversable
 import           Filesystem
 import           Filesystem.Path
@@ -63,24 +66,28 @@ openSimpleStore fp = do
                         if lastTouchExists 
                         then  do
                          (_, fpExpected) <- do
-                                  let 
-                                      defaultToNewest :: IO FilePath
-                                      defaultToNewest 
-                                        | Prelude.null sortedDates = fail "no state file found"
-                                        | otherwise =  (putStrLn "default to newest") >> (return $ Prelude.head $ Prelude.reverse $ sortedDates)
-                                      readLastTouch = do 
-                                         fpTxt <- Text.readFile $ encodeString $  lastTouch
-                                         let fpInLastTouch = fromText fpTxt
-                                         putStrLn "last touch read"
-                                         rslt <- isFile fpInLastTouch
-                                         if rslt
-                                            then return fpInLastTouch
-                                            else fail "last.touch appears corrupted"
+                                  let defaultToNewest :: IO FilePath
+                                      defaultToNewest | Prelude.null sortedDates = fail "no state file found"
+                                      defaultToNewest = pure $ last sortedDates
                                   
-
-                                  asyncLastTouch   <- async readLastTouch
-                                  asyncDefaultToNewest <- async $ (threadDelay (3 * 10^6 ) >> defaultToNewest)
-                                  waitAny [asyncLastTouch, asyncDefaultToNewest]                         
+                                  -- Read the file exception-free
+                                  let strfp = encodeString lastTouch
+                                  binaryContent <- try $ B.readFile strfp :: IO (Either SomeException B.ByteString)
+                                  -- Decode bytestring as text
+                                  case decodeUtf8' <$> binaryContent of
+                                    -- There was an error reading the file
+                                    Left err -> do
+                                      putStrLn $ "Error reading file " ++ strfp ++ ": " ++ show err
+                                      defaultToNewest
+                                    -- Bytes were loaded successfully
+                                    Right etext ->
+                                      case etext of
+                                        -- There was an error decoding the bytes as text
+                                        Left err -> do
+                                          putStrLn $ "Error parsing text of file " ++ strfp ++ ": " ++ show err
+                                          defaultToNewest
+                                        -- File was parsed as text successfully
+                                        Right text -> pure $ fromText text
                                   
                          putStrLn $ "file path: " ++ (show fpExpected)
                          openNewestStore createStoreFromFilePath ((fpExpected) : Prelude.reverse sortedDates)
