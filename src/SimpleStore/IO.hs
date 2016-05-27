@@ -65,7 +65,7 @@ openSimpleStore fp = do
                         putStrLn "last touch"
                         if lastTouchExists 
                         then  do
-                         (_, fpExpected) <- do
+                         fpExpected <- do
                                   let defaultToNewest :: IO FilePath
                                       defaultToNewest =
                                         if Prelude.null sortedDates
