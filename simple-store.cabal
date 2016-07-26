@@ -1,5 +1,5 @@
 Name:                   simple-store
-Version:                2.0.1
+Version:                2.0.2
 Author:                 Kevin Cotrone <kevincotrone@gmail.com>
 Maintainer:             Kevin Cotrone <kevincotrone@gmail.com>
 License:                BSD3
@@ -99,7 +99,19 @@ benchmark simple-store-bench
                       , async
                       , simple-store
                       , random
-                      , basic-prelude
+                      , stm
+                      , system-fileio
+                      , system-filepath
+                      , cereal
+                      , bytestring
+                      , unix
+                      , text
+                      , safe
+                      , bifunctors
+                      , time
+                      , async
+
+                        
   Ghc-Options:          -threaded -Wall  -rtsopts -prof -auto-all 
  
 Source-Repository head 

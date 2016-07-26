@@ -1,30 +1,30 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE OverloadedStrings          #-}
 module SimpleStoreSpec (main
                        , spec
                        , makeTestStore) where
 
 import           Control.Applicative
-import           Control.Concurrent (threadDelay)
+import           Control.Concurrent        (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.STM
 -- import           Control.Concurrent.STM.TMVar
 import           Data.Either
 import           Data.Traversable
 -- import           Data.Traversable
+import qualified Data.ByteString           as BS
+import           Data.Function
+import           Data.List                 (sortBy)
+import qualified Data.Serialize            as S
+import qualified Data.Text                 as Text
+import qualified Data.Text.IO              as Text
 import           Filesystem
 import           Filesystem.Path
-import Filesystem.Path.CurrentOS (encodeString)  
-import           Prelude                      hiding (sequence)
+import           Filesystem.Path.CurrentOS (encodeString)
+import           Prelude                   hiding (sequence)
 import           SimpleStore
 import           Test.Hspec
-import Data.List (sort,filter,reverse,sortBy)
-import qualified System.IO  as System
-import Data.Function
-import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
-import qualified Data.Serialize               as S
 
 
 
@@ -43,47 +43,43 @@ instance S.Serialize BoundInt where
 
 
 main :: IO ()
-main = do  
+main = do
   hspec spec
 
+
+
+
+-- | Purposefully corrupt the file last touched by the system
 corruptOneState :: IO ()
 corruptOneState = do
   let dir = "test-states"
   lst <- listDirectory dir
---  putStrLn (show lst)
-  
-  let (fp:sorted) = sortBy (compare `on` lexicalFirstChar) $
-                    filter (\fp -> fp /= "test-states/open.lock" ) $ lst
-                    
+  let (fp:_) = sortBy (compare `on` lexicalFirstChar) $
+                     filter (\fp' -> fp' /= "test-states/open.lock" ) $ lst
+
       lexicalFirstChar j = Prelude.take 1 . encodeString $ j
-      
+
   putStrLn (show fp)
   val <-  Text.readFile "test-states/last.touch"
-  System.writeFile (Text.unpack val) "corrupt on purpose"
- where
-   handleFpAt4 fp = if fp == "test-states/4checkpoint.st"
-                       then "test-states/0checkpoint.st"
-                       else fp
+  let corruption_string = BS.pack [1,2,3,4]
+  BS.writeFile (Text.unpack val) corruption_string
 
-makeTestStore = do 
+makeTestStore  :: IO (Either StoreError (SimpleStore Int),
+                   Filesystem.Path.FilePath,
+                   Int,
+                   Filesystem.Path.FilePath)
+makeTestStore = do
    let x = 10 :: Int
        dir = "test-states"
    workingDir <- getWorkingDirectory
-   eStore <- makeSimpleStore dir x 
+   eStore <- makeSimpleStore dir x
    return (eStore,dir,x,workingDir)
 
-
-makeTestTextStore = do 
-   let x = "10" :: String
-       dir = "test-states"
-   workingDir <- getWorkingDirectory
-   eStore <- makeSimpleStore dir x 
-   return (eStore,dir,x,workingDir)
 
 spec :: Spec
 spec = do
-  
-  describe "Making, creating checkpoints, closing, reopening" $ do    
+
+  describe "Making, creating checkpoints, closing, reopening" $ do
     it "should open an initial state, create checkpoints, and then open the state back up" $ do
       r <- isDirectory "test-states"
       if r
@@ -95,17 +91,17 @@ spec = do
       -- workingDir <- getWorkingDirectory
       -- eStore <- makeSimpleStore dir x
       (eStore,dir,x,workingDir)  <- makeTestStore
-      sequence $ getSimpleStore   <$> eStore
-      sequence $ createCheckpoint <$> eStore
-      sequence $ createCheckpoint <$> eStore
-      sequence $ createCheckpoint <$> eStore
-      sequence $ createCheckpoint <$> eStore
-      sequence $ createCheckpoint <$> eStore
-      sequence $ createCheckpoint <$> eStore
-      sequence $ closeSimpleStore <$> eStore
+      _ <- sequence $ getSimpleStore   <$> eStore
+      _ <- sequence $ createCheckpoint <$> eStore
+      _ <- sequence $ createCheckpoint <$> eStore
+      _ <- sequence $ createCheckpoint <$> eStore
+      _ <- sequence $ createCheckpoint <$> eStore
+      _ <- sequence $ createCheckpoint <$> eStore
+      _ <- sequence $ createCheckpoint <$> eStore
+      _ <- sequence $ closeSimpleStore <$> eStore
       eStore' <- openSimpleStore dir
       case eStore' of
-        (Left err) -> fail "Unable to open local state"
+        (Left err) -> fail ("Unable to open local state" ++ show err)
         (Right store) -> do
           x' <- getSimpleStore store
           removeTree $ workingDir </> dir
@@ -117,27 +113,27 @@ spec = do
           dir = "test-states"
       workingDir <- getWorkingDirectory
       (Right store) <- makeSimpleStore dir initial
-      createCheckpoint store
+      _ <- createCheckpoint store
       closeSimpleStore store
       (Right store') <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))
-      createCheckpoint store'
-      (\store -> modifySimpleStore store (return . modifyX)) store'
-      createCheckpoint store'
+      _ <- createCheckpoint store'
+      _ <- (\lStore -> modifySimpleStore lStore (return . modifyX)) store'
+      _ <- createCheckpoint store'
       closeSimpleStore store'
       eStore'' <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))
       case eStore'' of
-        (Left err) -> fail "Unable to open local state"
-        (Right store) -> do
+        (Left err) -> fail ("Unable to open local state" ++ show err)
+        (Right _) -> do
           x' <- getSimpleStore store'
-          removeTree $ workingDir </> dir
-          closeSimpleStore `traverse` eStore''
+          removeTree (workingDir </> dir)
+          _ <- closeSimpleStore `traverse` eStore''
           x' `shouldBe` (modifyX initial)
   describe "Async updating/creating checkpoints for a state" $ do
     it "Should start 100 threads trying to update a state and should modify the state correctly, be able to close and reopen the state, and then read the correct value" $ do
       let
         initial = 0 :: Int
-        initialString = show initial 
-        modifyX = (+ 2)
+        initialString = show initial
+        modifyX = (+ (2::Integer))
         dir = "test-states"
         functions = replicate 100  (\tv x -> (atomically $ readTMVar tv) >>
                                              (return . show . modifyX . read $ x)         )
@@ -146,63 +142,65 @@ spec = do
       waitTVar <- newEmptyTMVarIO
       (Right store) <- makeSimpleStore dir initialString
 
-      createCheckpoint store
+      _ <- createCheckpoint store
 
-      
+
       aRes <- traverse (\func -> async $ do
-                          modifySimpleStore store (func waitTVar)
+                          _ <- modifySimpleStore store (func waitTVar)
                           createCheckpoint store) functions :: IO [Async (Either StoreError ())]
-                                                            
+
       atomically $ putTMVar waitTVar ()
-      results <- traverse wait aRes
-      
-      x'' <- getSimpleStore store      
+      _ <- traverse wait aRes
+
+      x'' <- getSimpleStore store
       putStrLn $ "x -> " ++ (show x'')
-      createCheckpoint store
+      _ <- createCheckpoint store
       closeSimpleStore store
-     
+
       eStore <- openSimpleStore dir
       let store' = either (error . show) id eStore
       x' <- getSimpleStore store'
-      putStrLn $ "x' -> " ++ (show x')
-      closeSimpleStore `traverse` eStore
+      _ <- putStrLn $ "x' -> " ++ (show x')
+      _ <- closeSimpleStore `traverse` eStore
       x' `shouldBe` ("200" :: String)
   describe "test ordered state file" $ do
     it "should make sure the right file is being opened" $ do
       let dir = "test-states"
-      eStore <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))          
-      ex <- getSimpleStore `traverse` eStore
-      _ <- (flip modifySimpleStore (return . (1 +)) ) `traverse` eStore
-      _ <- createCheckpoint `traverse` eStore
-      ey <- getSimpleStore `traverse` eStore      
-      _ <- closeSimpleStore `traverse` eStore
-      eStore' <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))          
-      ex' <- getSimpleStore `traverse` eStore'          
-      closeSimpleStore `traverse` eStore'
-      putStrLn (show ex')
-      (isRight ex') `shouldBe` (Right True) 
+      eStore  <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))
+      _       <- getSimpleStore `traverse` eStore
+      _       <- (flip modifySimpleStore (return . (1 +)) ) `traverse` eStore
+      _       <- createCheckpoint `traverse` eStore
+      ey      <- getSimpleStore `traverse` eStore
+      _       <- closeSimpleStore `traverse` eStore
+      eStore' <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))
+      ex'     <- getSimpleStore `traverse` eStore'
+      _       <- closeSimpleStore `traverse` eStore'
+      _       <- putStrLn (show ex')
+      (isRight' ex') `shouldBe` (Right True)
       ex' `shouldBe` ey
 
   describe "purposefully corrupt file" $ do
-    it "Should corrupt a file and then open the old file and read it" $ do    
-          let dir = "test-states"          
-          eStore <- openSimpleStore dir :: IO (Either StoreError (SimpleStore (BoundInt)))          
+    it "Should corrupt a file and then open the old file and read it" $ do
+          let dir = "test-states"
+          eStore <- openSimpleStore dir :: IO (Either StoreError (SimpleStore (BoundInt)))
           ex <- getSimpleStore `traverse` eStore
           _ <- (flip modifySimpleStore (return . (1 +)) ) `traverse` eStore
-          _ <- threadDelay (70 * 10^6)
+          _ <- threadDelay (1 * 10^(6::Integer))
           _ <- createCheckpoint `traverse` eStore
           _ <- closeSimpleStore `traverse` eStore
+          putStrLn "corrupt"
           _ <- corruptOneState
-          eStore' <- openSimpleStore dir :: IO (Either StoreError (SimpleStore BoundInt))          
-          ex' <- getSimpleStore `traverse` eStore'          
-          closeSimpleStore `traverse` eStore'
-          putStrLn (show ex')
-          ex' `shouldBe` ex
-          (isRight ex') `shouldBe` (Right True) 
-            where
-              isRight (Right _) = Right True
-              isRight (Left s)  = Left s
+          putStrLn "done"
+          eStore' <- openSimpleStore dir :: IO (Either StoreError (SimpleStore BoundInt))
+          ex'     <- getSimpleStore   `traverse` eStore'
+          _       <- closeSimpleStore `traverse` eStore'
+          _       <- putStrLn (show ex')
 
+          ex'           `shouldBe` ex
+          (isRight' ex') `shouldBe` (Right True)
+            where
+              isRight' (Right _ )  = Right True
+              isRight' (Left  s )  = Left s
 
 
 
