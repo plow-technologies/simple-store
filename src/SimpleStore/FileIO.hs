@@ -95,7 +95,7 @@ openNewestStore _ [] = return . Left $ NoStoreFilesInPath
 openNewestStore f (x:xs) = do
   res <- catch (f x) (hIOException f xs)
   case res of
-    Left _ -> openNewestStore f xs
+    Left e -> (writeFile "errors.log" ("filePath:" ++  show x ++ "\n error: " ++ show e)) >> openNewestStore f xs
     _ -> do
       
       return res
