@@ -91,7 +91,7 @@ catchStoreError e
 
 -- | Opens the newest store that doesn't throw an exception or give a StoreError back as a result
 openNewestStore :: (FilePath -> IO (Either StoreError b)) -> [FilePath] -> IO (Either StoreError b)
-openNewestStore _ [] = return . Left $ StoreFileNotFound
+openNewestStore _ [] = return . Left $ NoStoreFilesInPath
 openNewestStore f (x:xs) = do
   res <- catch (f x) (hIOException f xs)
   case res of
