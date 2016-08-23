@@ -20,9 +20,15 @@ import           Prelude                   hiding (FilePath, sequence)
 import           Safe
 import           SimpleStore.Internal
 import           SimpleStore.Types
-import           System.IO                 (hClose,hFlush)
+import           System.IO                 (hClose,hFlush,hPrint,stderr)
 import           System.IO.Error
 import           System.Posix.Process
+
+
+
+
+
+
 
 
 -- | Return the given filepath if it is able to break the open.lock file
@@ -42,6 +48,12 @@ ableToBreakLock fp = do
          Nothing -> return . Left . StoreIOError $ "Unable to parse open.lock"
      else return $ Right fp
 
+
+
+
+
+
+
 -- | Catch all errors that allow the lock to still be taken
 ableToBreakLockError :: IOError -> Bool
 ableToBreakLockError = isDoesNotExistError
@@ -57,6 +69,12 @@ ableToBreakLockError e
 
 -}
 
+
+
+
+
+
+
 -- | Create a lock file with the current process pid in it
 -- The lock file should already be empty or non existent
 createLock :: FilePath -> IO (Either StoreError ())
@@ -66,6 +84,12 @@ createLock fp = do
   where showError :: IOException -> IO (Either StoreError ())
         showError e = return . Left . StoreIOError . show $ e
 
+
+
+
+
+
+
 -- | Attempt to create a lock inside of the given filepath
 attemptTakeLock :: FilePath -> IO (Either StoreError ())
 attemptTakeLock baseFP = do
@@ -74,44 +98,72 @@ attemptTakeLock baseFP = do
   res <- sequence $ createLock <$> allowBreak
   return . join $ res
 
+
+
+
+
+
 -- | release the lock for a given store
 releaseFileLock :: SimpleStore st -> IO ()
 releaseFileLock store = do
-  fp <- (</> fromText "open.lock") <$> (atomically . readTVar . storeDir $ store)
+  fp     <- (</> fromText "open.lock") <$> (atomically . readTVar . storeDir $ store)
   exists <- isFile fp
   when exists $ removeFile fp
+
+
+
+
+
+
 
 -- Catch errors for storing so they aren't thrown
 catchStoreError :: IOError -> StoreError
 catchStoreError e
   | isAlreadyInUseError e = StoreAlreadyOpen
   | isDoesNotExistError e = StoreFileNotFound
-  | isPermissionError e = StoreFileNotFound
-  | otherwise = StoreIOError . show $ e
+  | isPermissionError   e = StoreFileNotFound
+  | otherwise             = StoreIOError . show $ e
+
+
+
+
+
+
 
 -- | Opens the newest store that doesn't throw an exception or give a StoreError back as a result
 openNewestStore :: (FilePath -> IO (Either StoreError b)) -> [FilePath] -> IO (Either StoreError b)
-openNewestStore _ [] = return . Left $ StoreFileNotFound
+openNewestStore _ [] = return . Left $ NoStoreFilesInPath
 openNewestStore f (x:xs) = do
   res <- catch (f x) (hIOException f xs)
   case res of
-    Left _ -> openNewestStore f xs
-    _ -> do
-      
-      return res
-  where  hIOException :: (FilePath -> IO (Either StoreError b)) -> [FilePath] -> IOException -> IO (Either StoreError b)
-         hIOException func ys _ = openNewestStore func ys
+    Left e -> putStrLn "errors found and written to errors.log" >>
+              (writeFile "errors.log" ("filePath:" ++  show x ++ "\n error: " ++ show e))
+              >> openNewestStore f xs
+    _ -> return res
+  where  hIOException :: (FilePath -> IO (Either StoreError b)) ->  -- createNewStore
+                         [FilePath] ->                            -- list of files to try                         
+                         IOException ->                           -- io exceptions
+                         IO (Either StoreError b)
+         hIOException func ys e = hPrint stderr  e >>
+                                  openNewestStore func ys
 
 -- Attempt to open a store from a filepath
 createStoreFromFilePath :: (Serialize st) => FilePath -> IO (Either StoreError (SimpleStore st))
 createStoreFromFilePath fp = do
   let eVersion = getVersionNumber . filename $ fp
-  fHandle <- openFile fp ReadWriteMode
-  fConts <- BS.hGetContents fHandle
-  sequence $ first (StoreIOError . show) $ (createStore (directory fp) fHandle) <$> 
-                                           eVersion <*> 
-                                           decode fConts
+  eFHandle <- try (openFile fp ReadWriteMode ) :: IO (Either SomeException Handle)
+  eFConts  <- (either (return . Left) (try . BS.hGetContents) eFHandle) 
+  putStrLn "createStoreFromFilepath"
+  sequence $ toStoreIOError  $ createStore (directory fp)  <$> toStringError eFHandle <*> 
+                                                               eVersion               <*> 
+                                                               (toStringError eFConts >>= decode )
 
+
+toStoreIOError :: Either String c -> Either StoreError c
+toStoreIOError = first (StoreIOError . show)
+
+toStringError :: Either SomeException c -> Either String c
+toStringError = first show
 
 checkpointBaseFileName :: Text
 checkpointBaseFileName = "checkpoint.st"
@@ -131,14 +183,7 @@ checkpoint store = do
   !oldVersion <- readTVarIO tVersion
 
   let !newVersion         = (oldVersion + 1) `mod` 5
-      !olderVersion       = (oldVersion - 1) `mod` 5 -- Marked for deletion
-      !encodedState       = encode state
-
-      oldFileName         = ( Data.Text.append ( pack . show $ olderVersion )
-                                                 checkpointBaseFileName     )
-                            
-      olderCheckpointPath = fp </> fromText  oldFileName
-      
+      !encodedState       = encode state      
       newFileName         =  ( Data.Text.append ( pack.show   $ newVersion )
                                                   checkpointBaseFileName   )                    
       checkpointPath      = fp </> fromText  newFileName
@@ -146,7 +191,7 @@ checkpoint store = do
 
 
   newHandle <- openFile checkpointPath WriteMode
-  Text.writeFile (encodeString $ fp </> "last.touch")  (pack.encodeString $ checkpointPath)
+  _         <- Text.writeFile (encodeString $ fp </> "last.touch")  (pack.encodeString $ checkpointPath)
   !eFileRes <- catch (Right <$> BS.hPut newHandle encodedState)
                      (return . Left . catchStoreError)
                

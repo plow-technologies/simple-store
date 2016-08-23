@@ -3,6 +3,11 @@
 # Last Updated 05-05-2016
 
 Simple-Store
++ 2.0.2
+   better exception handling in opening state store.
+   Separated out different try/catch places
++ 2.0.1.1
+   added a new exception "NoStoreFileFound"
 + 2.0.1
    last touch not present shouldn't throw exception
 + 2.0.0

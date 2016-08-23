@@ -1,47 +1,47 @@
+# This is a default circle.yml that can be used as
+# starting point.
+
 machine:
   pre:
-    - sudo add-apt-repository ppa:hvr/ghc -y
+    - echo 'deb http://download.fpcomplete.com/ubuntu precise main'|sudo tee /etc/apt/sources.list.d/fpco.list
+    - sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 575159689BEFB442
     - sudo apt-get update
     - sudo apt-get install gcc-4.8
     - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 90
     - gcc --version
-  ghc:
-    version: 7.10.2
-
+    - sudo apt-get install stack -y
+    
   environment:
-    PATH: /opt/ghc/7.10.3/bin/:$HOME/.cabal/bin:$CIRCLE_ARTIFACTS:$PATH/$HOME/simple-store/.cabal-sandbox/bin
+    PATH: $HOME/.cabal/bin:$CIRCLE_ARTIFACTS:$PATH:$HOME/$CIRCLE_PROJECT_REPONAME/.cabal-sandbox/bin
 
 dependencies:
   cache_directories:
-    - "~/.cabal"
-    - "~/simple-store/.cabal-sandbox"
-    - "~/simple-store/dist"
-    - "~/ghc"
+    - ".stack-work"
+    - "~/.stack"
+  
   override:
-    - if [ -d ~/ghc ]; then sudo cp -r ~/ghc /opt; fi
-    - if ghc --version | grep 7.10.3; then echo "Version 7.10.3"; else sudo apt-get install ghc-7.10.3 ghc-7.10.3-prof -y && 
-       sudo cp -r /opt/ghc 
-       $HOME/ghc && echo "copy complete" ; fi
-    - ghc --version
-    - if cabal --version | grep 1.23.0.0; then echo "Version 1.23.0.0"; else cd ~/ && git clone https://github.com/plow-technologies/cabal.git && cd cabal && cabal --no-require-sandbox install -j2 Cabal/ cabal-install/; fi
-    - git clone git@github.com:plow-technologies/plow-scripts.git
-    - cp plow-scripts/config $HOME/.cabal/config
-    - cabal update
-    - cabal sandbox init
-    - cabal install
-    - cabal install --enable-tests -j1
-    - if [ "$CIRCLE_BRANCH" == "production" ]; then yesod configure && echo "configuring for production build"; else cabal configure -fdev && echo "configuring non-production build"; fi
+    - stack setup
+    - stack build --only-dependencies
 
 test:
   override:
-    - cabal configure
-    - cabal build -j1:
-        timeout: 3000
-    - cabal test --show-details=always -j2:
-        timeout: 3000
+    - stack test simple-store
 
+# Comment this section below if you don't want to upload to hackage
 deployment:
   staging:
     branch: master
     commands:
-      - sh plow-scripts/hackage.sh
+      # Setup for Tag Release
+      - git clone git@github.com:Daniel-Diaz/tagthis.git
+      - cd tagthis && stack build
+      - git config --global user.email "ar@plowtech.net"
+      - git config --global user.name "plowtech-bot"
+      # Upload to plow hackage
+      - stack sdist --ignore-check
+      - cd .stack-work/dist/x86_64-linux/Cabal* && tarball=$(ls -t *.gz | head -1) &&
+           echo Using $tarball as tarball file &&
+           status=$(curl --output /dev/stderr --write-out "%{http_code}" -i -F package=@$tarball https://hackage.plowtech.net/packages/upload -u $hackage_username:$hackage_password) &&
+           echo export status=$status >> ~/.bashrc && source ~/.bashrc
+      # If hackage successful then create release in github
+      - if [[ "$status" == 200 ]]; then tagthis/.stack-work/dist/x86_64-linux/Cabal*/build/tagthis/tagthis; fi

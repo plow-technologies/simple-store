@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module SimpleStore.IO where
@@ -12,7 +13,7 @@ import           Data.List
 import qualified Data.Serialize               as S
 import           Data.Text                    hiding (filter, foldl, map,
                                                maximum, stripPrefix)
-import qualified Data.Text.IO as Text                 
+
 import Data.Text.Encoding (decodeUtf8')
 import qualified Data.ByteString as B
 import           Data.Traversable
@@ -21,13 +22,14 @@ import           Filesystem.Path
 import           Filesystem.Path.CurrentOS    hiding (decode)
 import           Prelude                      hiding (FilePath, sequence,
                                                writeFile)
-import Control.Concurrent.Async
-import Control.Concurrent 
+
+
+import           Data.Time                   (UTCTime)
 import           SimpleStore.FileIO
 import           SimpleStore.Internal
 import           SimpleStore.Types
 import Data.Either
-import Data.Time.Clock.POSIX 
+
 
 
 -- | Get the current value of the store
@@ -44,62 +46,61 @@ putSimpleStore store state = withLock store $ putWriteStore store state
 -- it is plain text encoded and updated on every checkpoint.
 openSimpleStore :: S.Serialize st => FilePath -> IO (Either StoreError (SimpleStore st))
 openSimpleStore fp = do
-  dir <- makeAbsoluteFp fp
+  dir    <- makeAbsoluteFp fp
   exists <- isDirectory dir
   if exists
-     then do lock <- attemptTakeLock fp
-             if isRight lock
-                then do dirContents <- listDirectory dir
-                        let lastTouch = (dir </> "last.touch")
-                        lastTouchExists <- isFile lastTouch                        
-                        let files = filter isState dirContents
-                        modifiedDates <-
-                           traverse (\file -> do               -- Lambda is because the instance for Traversable on ()
-                                        t <- getModified file  -- Traverses the second item so sequence only evaluates
-                                        
-                                        return (t,file)        -- the second item                                        
-                                       ) files                         
-                        let
-                          times = utcTimeToPOSIXSeconds . fst <$> modifiedDates
-                          sortedDates = snd <$> sortBy (compare `on` fst) modifiedDates
-                        putStrLn "last touch"
-                        if lastTouchExists 
-                        then  do
-                         fpExpected <- do
-                                  let defaultToNewest :: IO FilePath
-                                      defaultToNewest =
-                                        if Prelude.null sortedDates
-                                           then fail "no state file found"
-                                           else pure $ Prelude.last sortedDates
-                                  
-                                  -- Read the file exception-free
-                                  let strfp = encodeString lastTouch
-                                  binaryContent <- try $ B.readFile strfp :: IO (Either SomeException B.ByteString)
-                                  -- Decode bytestring as text
-                                  case decodeUtf8' <$> binaryContent of
-                                    -- There was an error reading the file
-                                    Left err -> do
-                                      putStrLn $ "Error reading file " ++ strfp ++ ": " ++ show err
-                                      defaultToNewest
-                                    -- Bytes were loaded successfully
-                                    Right etext ->
-                                      case etext of
-                                        -- There was an error decoding the bytes as text
-                                        Left err -> do
-                                          putStrLn $ "Error parsing text of file " ++ strfp ++ ": " ++ show err
-                                          defaultToNewest
-                                        -- File was parsed as text successfully
-                                        Right text -> pure $ fromText text
-                                  
-                         putStrLn $ "file path: " ++ (show fpExpected)
-                         openNewestStore createStoreFromFilePath ((fpExpected) : Prelude.reverse sortedDates)
-                        else
-                          openNewestStore createStoreFromFilePath ( Prelude.reverse sortedDates)
-                else return . Left $ StoreLocked
+     then  openStoreFound dir
      else return . Left $ StoreFolderNotFound
+  where     
+     isSTPrefixedFile    = isState
+     lastTouch      dir  = dir </> "last.touch"
+     sortModifiedDateTuples modifiedDates = snd <$> sortBy (compare `on` fst) modifiedDates
+     timeSortFiles dirContents          = sortModifiedDateTuples <$>
+                                          traverse buildModifiedDateTuple (filter isSTPrefixedFile dirContents)
+     buildModifiedDateTuple :: FilePath -> IO (UTCTime, FilePath)  -- time last modified and file being referred to 
+     buildModifiedDateTuple file = (,file) <$> getModified file
+     defaultToNewest :: [FilePath] -> IO FilePath
+     defaultToNewest filesSortedByTouchTime = do
+       if Prelude.null filesSortedByTouchTime
+       then fail "no state file found"
+       else pure $ Prelude.last filesSortedByTouchTime
+     openStoreFound dir  = do lock <- attemptTakeLock fp
+                              if isRight lock
+                                 then do dirContents              <- listDirectory        dir
+                                         filesSortedByTouchTime   <- timeSortFiles dirContents    
+                                         lastTouchExists          <- (isFile . lastTouch) dir                                         
+                                         if lastTouchExists 
+                                         then  do
+                                          fpExpected <- do                                                   
+                                                   let stringFilePath = encodeString (lastTouch dir) :: String
+                                                   binaryContent <- try $ B.readFile stringFilePath :: IO (Either SomeException B.ByteString)
+                                                   -- Decode bytestring as text
+                                                   case decodeUtf8' <$> binaryContent of                                                     
+                                                    Left err -> do
+                                                    -- There was an error reading the file
+                                                      putStrLn $ "Error reading file " ++ stringFilePath ++ ": " ++ show err
+                                                      defaultToNewest filesSortedByTouchTime
+                                                    
+                                                    Right etext ->
+                                                      -- Bytes were loaded successfully 
+                                                      case etext of
+                                                        
+                                                        Left err -> do
+                                                          -- There was an error decoding the bytes as text
+                                                          putStrLn $ "Error parsing text of file " ++ stringFilePath ++ ": " ++ show err
+                                                          defaultToNewest filesSortedByTouchTime
+                                                        -- File was parsed as text successfully
+                                                        Right text -> pure $ fromText text
+                                          putStrLn $ "file path: " ++ (show fpExpected)
+                                          openNewestStore createStoreFromFilePath ((fpExpected) : Prelude.reverse filesSortedByTouchTime)
+                                         else
+                                           openNewestStore createStoreFromFilePath ( Prelude.reverse filesSortedByTouchTime)
+                                 else return . Left $ StoreLocked
 
 
-   
+
+
+
 -- | Initialize a simple store from a given filepath and state.
 -- The filepath should just be to the directory you want the state created in
 -- as in "state"
