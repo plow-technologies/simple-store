@@ -212,8 +212,8 @@ checkpoint store = do
                          _         <- putTMVar  tHandle fHandle
                          return oldHandle
 
-            _       <- hClose oHandle
             _       <- fileSynchronise =<< handleToFd oHandle
+            _       <- hClose oHandle
             _       <- hFlush fHandle
             _       <- fileSynchronise =<< handleToFd fHandle
             return $ Right ()
