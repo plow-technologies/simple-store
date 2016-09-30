@@ -22,7 +22,9 @@ import           SimpleStore.Internal
 import           SimpleStore.Types
 import           System.IO                 (hClose,hFlush,hPrint,stderr)
 import           System.IO.Error
+import           System.Posix.IO
 import           System.Posix.Process
+import           System.Posix.Unistd
 
 
 
@@ -203,15 +205,17 @@ checkpoint store = do
           tHandle  = storeHandle            store
 
           updateIfWritten  l@(Left _) _       _       = return l
-          updateIfWritten  _          version fHandle = do
+          updateIfWritten  _ version fHandle = do
             oHandle <- atomically $ do            
                          _         <- writeTVar tVersion version
                          oldHandle <- takeTMVar tHandle
                          _         <- putTMVar  tHandle fHandle
                          return oldHandle
 
-            _       <- hClose oHandle    
+            _       <- hClose oHandle
+            _       <- fileSynchronise =<< handleToFd oHandle
             _       <- hFlush fHandle
+            _       <- fileSynchronise =<< handleToFd fHandle
             return $ Right ()
 
 
