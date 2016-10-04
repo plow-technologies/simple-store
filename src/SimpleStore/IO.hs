@@ -148,3 +148,8 @@ modifySimpleStore store modifyFunc = withLock store $ do
 createCheckpoint :: (S.Serialize st) => SimpleStore st -> IO (Either StoreError ())
 createCheckpoint store = withLock store $ checkpoint store
 
+
+
+-- | Write the current store to disk in the given folder immediately
+createCheckpointImmediate :: (S.Serialize st) => SimpleStore st -> IO (Either StoreError ())
+createCheckpointImmediate store = withLock store $ checkpointFsync store

@@ -215,14 +215,55 @@ checkpoint store = do
                          oldHandle <- takeTMVar tHandle
                          _         <- putTMVar  tHandle fHandle
                          return oldHandle
+            _       <- hClose oHandle
+            _       <- hFlush fHandle
+            return $ Right ()
+
+
+
+
+-- | Exactly like above but with the write forced immediately.
+-- Use for unstable power situations but it does degrade performance.
+checkpointFsync :: (Serialize st) => SimpleStore st -> IO (Either StoreError ())
+checkpointFsync store = do
+
+  !fp         <- readTVarIO . storeDir $ store
+  !state      <- readTVarIO tState
+  !oldVersion <- readTVarIO tVersion
+
+  let !newVersion         = (oldVersion + 1) `mod` 5
+      !encodedState       = encode state      
+      newFileName         =  ( Data.Text.append ( pack.show   $ newVersion )
+                                                  checkpointBaseFileName   )                    
+      checkpointPath      = fp </> fromText  newFileName
+
+
+
+  newHandle <- openFile checkpointPath WriteMode
+  _         <- Text.writeFile (encodeString $ fp </> "last.touch")  (pack.encodeString $ checkpointPath)
+  !eFileRes <- catch (Right <$> BS.hPut newHandle encodedState)
+                     (return . Left . catchStoreError)
+
+  updateIfWritten eFileRes newVersion newHandle  
+    where
+
+          tState   = storeState             store
+          tVersion = storeCheckpointVersion store
+          tHandle  = storeHandle            store
+
+          updateIfWritten  l@(Left _) _       _       = return l
+          updateIfWritten  _ version fHandle = do
+            oHandle <- atomically $ do            
+                         _         <- writeTVar tVersion version
+                         oldHandle <- takeTMVar tHandle
+                         _         <- putTMVar  tHandle fHandle
+                         return oldHandle
 
             _       <- fileSynchronise =<< handleToFd oHandle
             _       <- hClose oHandle
             _       <- hFlush fHandle
             _       <- fileSynchronise =<< handleToFd fHandle
             return $ Right ()
-
-
 
 
 
