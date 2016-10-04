@@ -82,10 +82,15 @@ ableToBreakLockError e
 createLock :: FilePath -> IO (Either StoreError ())
 createLock fp = do
   pid <- getProcessID
-  catch (Right <$> writeFile (encodeString fp) (show pid)) showError
+  catch (Right <$> writeLockFile pid) showError
   where showError :: IOException -> IO (Either StoreError ())
-        showError e = return . Left . StoreIOError . show $ e
-
+        showError         = return . Left . StoreIOError . show 
+        writeLockFile pid =  withFile fp
+                                      WriteMode
+                                      (\lockHandle -> do
+                                          hPrint lockHandle pid
+                                          fileSynchronise =<< handleToFd lockHandle
+                                          ) 
 
 
 
@@ -95,12 +100,11 @@ createLock fp = do
 -- | Attempt to create a lock inside of the given filepath
 attemptTakeLock :: FilePath -> IO (Either StoreError ())
 attemptTakeLock baseFP = do
-  let fp = baseFP </> (fromText "open.lock")
-  allowBreak <- ableToBreakLock fp
-  res <- sequence $ createLock <$> allowBreak
+  allowBreak <- ableToBreakLock lockFilePath
+  res        <- sequence $ createLock <$> allowBreak
   return . join $ res
-
-
+  where
+   lockFilePath  = baseFP </> (fromText "open.lock")
 
 
 
