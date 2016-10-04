@@ -32,7 +32,7 @@ instance Serialize TestNum where
 
 
 intList :: [TestNum]
-intList = TestNum <$> [0 .. 1000]
+intList = TestNum <$> [0 .. 100]
 
 testTreeDir = "xkcd-test-states"
 

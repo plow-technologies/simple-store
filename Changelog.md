@@ -3,6 +3,11 @@
 # Last Updated 05-05-2016
 
 Simple-Store
++ 2.0.3
+  fsync on checkpoints and locks
+  createCheckpointImmediate allows fsync to be called optionally.
+  immediate checkpoints always on lock files
+	
 + 2.0.2
    better exception handling in opening state store.
    Separated out different try/catch places
