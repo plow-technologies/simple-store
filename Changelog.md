@@ -1,8 +1,16 @@
 # Changelog
 
-# Last Updated 05-05-2016
+# Last Updated 11-04-2016	
 
 Simple-Store
++ 3.0.0
+  removed close store  
++ 2.1.0
+  removed Handle holding
++ 2.0.4
+  open.lock functionality removed
+  made fsync run inbetweeen var locks to force it better
+	
 + 2.0.3
   fsync on checkpoints and locks
   createCheckpointImmediate allows fsync to be called optionally.

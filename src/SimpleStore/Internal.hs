@@ -10,7 +10,7 @@ module SimpleStore.Internal (
   , getVersionNumber
   , createStore
   , isState
-  , closeStoreHandle
+
 ) where
 
 import           Control.Applicative
@@ -28,7 +28,6 @@ import           Prelude                      hiding (FilePath, sequence)
 import           SimpleStore.Types
 import           System.Posix.Process
 import           System.Posix.Types
-import           System.IO                    (Handle, hClose)
 
 
 
@@ -64,21 +63,18 @@ getVersionNumber fp = second fst $ join $ decimal <$> eTextFp
   where eTextFp = first unpack $ toText fp
 
 -- Create a store from it's members. Just creates the necessary TMVars/TVars
-createStore :: FilePath -> Handle -> Int -> st -> IO (SimpleStore st)
-createStore fp fHandle version st = do
-  sState <- newTVarIO st
-  sLock <- newTMVarIO StoreLock
-  sHandle <- newTMVarIO fHandle
-  sVersion <- newTVarIO version
-  sFp <- newTVarIO fp
-  return $ SimpleStore sFp sState sLock sHandle sVersion
+createStore :: FilePath -> Int -> st -> IO (SimpleStore st)
+createStore fp version st = do
+  sState   <- newTVarIO  st
+  sLock    <- newTMVarIO StoreLock
+  sVersion <- newTVarIO  version
+  sFp      <- newTVarIO  fp
+  return $ SimpleStore { storeDir               = sFp
+                       , storeState             = sState
+                       , storeLock              = sLock
+                       , storeCheckpointVersion = sVersion}
 
 -- Checks the extension of a filepath for ".st"
 isState :: FilePath -> Bool
 isState fp = extension fp == Just "st"
 
--- Release the handle for a simplestore state file
-closeStoreHandle :: SimpleStore st -> IO ()
-closeStoreHandle store = do
-  fHandle <- atomically . readTMVar . storeHandle $ store
-  hClose fHandle
