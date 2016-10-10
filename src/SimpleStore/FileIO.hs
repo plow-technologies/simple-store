@@ -188,7 +188,6 @@ withFsync NoFsync _       = return ()
 withFsync Fsync  oHandle  = do
   fileSynchronise =<< handleToFd oHandle
 
-  
 -- | Create a checkpoint for a store. This attempts to write the state to disk
 -- If successful it updates the version, releases the old file handle, and deletes the old file
 checkpoint :: (Serialize st) => WithFsync -> SimpleStore st -> IO (Either StoreError ())
@@ -218,16 +217,16 @@ checkpoint fsync store = do
           tVersion = storeCheckpointVersion store
           tHandle  = storeHandle            store
 
-          updateIfWritten  l@(Left _) _       _       = return l
+          updateIfWritten  l@(Left s) _       _       = putStrLn "updateIfWritten error: " *> print s *> pure l
           updateIfWritten  _ version' fHandle = do
             oHandle <- atomically $ do            
                          _         <- writeTVar tVersion version'
                          oldHandle <- takeTMVar tHandle
                          _         <- putTMVar  tHandle fHandle
-                         return oldHandle
-            _       <- withFsync fsync oHandle
+                         return oldHandle            
             _       <- hClose oHandle
             _       <- hFlush fHandle
+            _       <- withFsync fsync fHandle
             return $ Right ()
 
 
