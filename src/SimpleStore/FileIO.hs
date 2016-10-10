@@ -89,6 +89,7 @@ createLock fp = do
                                       WriteMode
                                       (\lockHandle -> do
                                           hPrint lockHandle pid
+                                          hFlush lockHandle
                                           fileSynchronise =<< handleToFd lockHandle
                                           ) 
 
@@ -179,11 +180,20 @@ checkpointBaseFileName = "checkpoint.st"
 
 
 
+-- | If using Fsync on a file is enabled then run it on the given handle
+data WithFsync = NoFsync | Fsync
+
+withFsync :: WithFsync -> Handle -> IO ()
+withFsync NoFsync _       = return ()
+withFsync Fsync  oHandle  = do
+  fileSynchronise =<< handleToFd oHandle
+
+  
 -- | Create a checkpoint for a store. This attempts to write the state to disk
 -- If successful it updates the version, releases the old file handle, and deletes the old file
-checkpoint :: (Serialize st) => SimpleStore st -> IO (Either StoreError ())
-checkpoint store = do
-  
+checkpoint :: (Serialize st) => WithFsync -> SimpleStore st -> IO (Either StoreError ())
+checkpoint fsync store = do
+
   !fp         <- readTVarIO . storeDir $ store
   !state      <- readTVarIO tState
   !oldVersion <- readTVarIO tVersion
@@ -209,60 +219,15 @@ checkpoint store = do
           tHandle  = storeHandle            store
 
           updateIfWritten  l@(Left _) _       _       = return l
-          updateIfWritten  _ version fHandle = do
+          updateIfWritten  _ version' fHandle = do
             oHandle <- atomically $ do            
-                         _         <- writeTVar tVersion version
+                         _         <- writeTVar tVersion version'
                          oldHandle <- takeTMVar tHandle
                          _         <- putTMVar  tHandle fHandle
                          return oldHandle
+            _       <- withFsync fsync oHandle
             _       <- hClose oHandle
             _       <- hFlush fHandle
-            return $ Right ()
-
-
-
-
--- | Exactly like above but with the write forced immediately.
--- Use for unstable power situations but it does degrade performance.
-checkpointFsync :: (Serialize st) => SimpleStore st -> IO (Either StoreError ())
-checkpointFsync store = do
-
-  !fp         <- readTVarIO . storeDir $ store
-  !state      <- readTVarIO tState
-  !oldVersion <- readTVarIO tVersion
-
-  let !newVersion         = (oldVersion + 1) `mod` 5
-      !encodedState       = encode state      
-      newFileName         =  ( Data.Text.append ( pack.show   $ newVersion )
-                                                  checkpointBaseFileName   )                    
-      checkpointPath      = fp </> fromText  newFileName
-
-
-
-  newHandle <- openFile checkpointPath WriteMode
-  _         <- Text.writeFile (encodeString $ fp </> "last.touch")  (pack.encodeString $ checkpointPath)
-  !eFileRes <- catch (Right <$> BS.hPut newHandle encodedState)
-                     (return . Left . catchStoreError)
-
-  updateIfWritten eFileRes newVersion newHandle  
-    where
-
-          tState   = storeState             store
-          tVersion = storeCheckpointVersion store
-          tHandle  = storeHandle            store
-
-          updateIfWritten  l@(Left _) _       _       = return l
-          updateIfWritten  _ version fHandle = do
-            oHandle <- atomically $ do            
-                         _         <- writeTVar tVersion version
-                         oldHandle <- takeTMVar tHandle
-                         _         <- putTMVar  tHandle fHandle
-                         return oldHandle
-
-            _       <- fileSynchronise =<< handleToFd oHandle
-            _       <- hClose oHandle
-            _       <- hFlush fHandle
-            _       <- fileSynchronise =<< handleToFd fHandle
             return $ Right ()
 
 
