@@ -90,7 +90,6 @@ createLock fp = do
                                       (\lockHandle -> do
                                           hPrint lockHandle pid
                                           hFlush lockHandle
-                                          withFsync Fsync lockHandle
                                           ) 
 
 
