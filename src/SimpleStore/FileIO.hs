@@ -22,9 +22,9 @@ import           SimpleStore.Internal
 import           SimpleStore.Types
 import           System.IO                 (hClose,hFlush,hPrint,stderr)
 import           System.IO.Error
-import           System.Posix.IO
-import           System.Posix.Process
-import           System.Posix.Unistd
+import           System.Posix.IO      (handleToFd,closeFd)
+import           System.Posix.Process (getProcessID)
+import           System.Posix.Unistd (fileSynchronise)
 
 
 
@@ -186,7 +186,9 @@ data WithFsync = NoFsync | Fsync
 withFsync :: WithFsync -> Handle -> IO ()
 withFsync NoFsync _       = return ()
 withFsync Fsync  oHandle  = do
-  fileSynchronise =<< handleToFd oHandle
+  fd <- handleToFd oHandle
+  fileSynchronise fd
+  closeFd fd
 
 -- | Create a checkpoint for a store. This attempts to write the state to disk
 -- If successful it updates the version, releases the old file handle, and deletes the old file
@@ -223,10 +225,10 @@ checkpoint fsync store = do
                          _         <- writeTVar tVersion version'
                          oldHandle <- takeTMVar tHandle
                          _         <- putTMVar  tHandle fHandle
-                         return oldHandle            
+                         return oldHandle
+            _       <- withFsync fsync oHandle                         
             _       <- hClose oHandle
             _       <- hFlush fHandle
-            _       <- withFsync fsync fHandle
             return $ Right ()
 
 
