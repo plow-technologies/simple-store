@@ -87,8 +87,11 @@ createLock fp = do
         showError         = return . Left . StoreIOError . show 
         writeLockFile pid =  withFile fp
                                       WriteMode
-                                      (\lockHandle -> hPrint lockHandle pid ) 
-
+                                     (\lockHandle -> do
+                                         hPrint lockHandle pid
+                                         hFlush lockHandle
+                                         fileSynchronise =<< handleToFd lockHandle
+                                         ) 
 
 
 
