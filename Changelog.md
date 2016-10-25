@@ -1,8 +1,10 @@
 # Changelog
 
-# Last Updated 05-05-2016
+# Last Updated 10-25-2016	
 
 Simple-Store
++ 2.0.4
+  open.lock functionality removed
 + 2.0.3
   fsync on checkpoints and locks
   createCheckpointImmediate allows fsync to be called optionally.

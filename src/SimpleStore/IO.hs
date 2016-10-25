@@ -66,38 +66,33 @@ openSimpleStore fp = do
        then fail "no state file found"
        else pure $ Prelude.last filesSortedByTouchTime
 
-     openStoreFound dir  = do lock <- attemptTakeLock fp
-                              case lock of
-                                (Left e)  ->   return . Left $ e
-                                (Right _) ->   do dirContents              <- listDirectory        dir
-                                                  filesSortedByTouchTime   <- timeSortFiles dirContents    
-                                                  lastTouchExists          <- (isFile . lastTouch) dir                                         
-                                                  if lastTouchExists 
-                                                  then  do
-                                                   fpExpected <- do                                                   
-                                                            let stringFilePath = encodeString (lastTouch dir) :: String
-                                                            binaryContent <- try $ B.readFile stringFilePath :: IO (Either SomeException B.ByteString)
-                                                            -- Decode bytestring as text
-                                                            case decodeUtf8' <$> binaryContent of                                                     
-                                                             Left err -> do
-                                                             -- There was an error reading the file
-                                                               putStrLn $ "Error reading file " ++ stringFilePath ++ ": " ++ show err
-                                                               defaultToNewest filesSortedByTouchTime
-
-                                                             Right etext ->
-                                                               -- Bytes were loaded successfully 
-                                                               case etext of
-
-                                                                 Left err -> do
-                                                                   -- There was an error decoding the bytes as text
-                                                                   putStrLn $ "Error parsing text of file " ++ stringFilePath ++ ": " ++ show err
-                                                                   defaultToNewest filesSortedByTouchTime
-                                                                 -- File was parsed as text successfully
-                                                                 Right text -> pure $ fromText text
-                                                   putStrLn $ "file path: " ++ (show fpExpected)
-                                                   openNewestStore createStoreFromFilePath ((fpExpected) : Prelude.reverse filesSortedByTouchTime)
-                                                  else
-                                                    openNewestStore createStoreFromFilePath ( Prelude.reverse filesSortedByTouchTime)
+     openStoreFound dir  = do       dirContents              <- listDirectory        dir
+                                    filesSortedByTouchTime   <- timeSortFiles dirContents    
+                                    lastTouchExists          <- (isFile . lastTouch) dir                                         
+                                    if lastTouchExists 
+                                    then  do
+                                     fpExpected <- do                                                   
+                                              let stringFilePath = encodeString (lastTouch dir) :: String
+                                              binaryContent <- try $ B.readFile stringFilePath :: IO (Either SomeException B.ByteString)
+                                              -- Decode bytestring as text
+                                              case decodeUtf8' <$> binaryContent of                                                     
+                                               Left err -> do
+                                               -- There was an error reading the file
+                                                 putStrLn $ "Error reading file " ++ stringFilePath ++ ": " ++ show err
+                                                 defaultToNewest filesSortedByTouchTime
+                                               Right etext ->
+                                                 -- Bytes were loaded successfully 
+                                                 case etext of
+                                                   Left err -> do
+                                                     -- There was an error decoding the bytes as text
+                                                     putStrLn $ "Error parsing text of file " ++ stringFilePath ++ ": " ++ show err
+                                                     defaultToNewest filesSortedByTouchTime
+                                                   -- File was parsed as text successfully
+                                                   Right text -> pure $ fromText text
+                                     putStrLn $ "file path: " ++ (show fpExpected)
+                                     openNewestStore createStoreFromFilePath ((fpExpected) : Prelude.reverse filesSortedByTouchTime)
+                                    else
+                                      openNewestStore createStoreFromFilePath ( Prelude.reverse filesSortedByTouchTime)
                                    
 
 
@@ -110,7 +105,6 @@ openSimpleStore fp = do
 makeSimpleStore :: (S.Serialize st) => FilePath -> st -> IO (Either StoreError (SimpleStore st))
 makeSimpleStore dir state = do
   fp <- initializeDirectory dir
-  _ <- attemptTakeLock fp
   let encodedState = S.encode state
       checkpointPath = fp </> (fromText . pack $ (show $ 1 + initialVersion) ++ (unpack checkpointBaseFileName))
       checkpointPathBackup  = fp </> (fromText . pack $ (show $ initialVersion) ++
@@ -136,7 +130,6 @@ attemptOpenDefault fp initialState = do
 closeSimpleStore :: SimpleStore st -> IO ()
 closeSimpleStore store = withLock store $ do
   closeStoreHandle store
-  releaseFileLock store
 
 -- | Run a function against the state and put the result into the state
 -- This does not write the store to disk

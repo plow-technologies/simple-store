@@ -1,7 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
-module SimpleStore.FileIO where
+module SimpleStore.FileIO ( makeAbsoluteFp
+                          , openNewestStore
+                          , initializeDirectory
+                          , createStoreFromFilePath
+                          , checkpointBaseFileName
+                          , checkpoint
+                          , WithFsync(..)) where
 
 import           Control.Applicative
 import           Control.Concurrent.STM
@@ -17,13 +23,11 @@ import           Filesystem                hiding (readFile, writeFile)
 import           Filesystem.Path
 import           Filesystem.Path.CurrentOS hiding (decode, encode)
 import           Prelude                   hiding (FilePath, sequence)
-import           Safe
 import           SimpleStore.Internal
 import           SimpleStore.Types
 import           System.IO                 (hClose,hFlush,hPrint,stderr)
 import           System.IO.Error
 import           System.Posix.IO      (handleToFd,closeFd)
-import           System.Posix.Process (getProcessID)
 import           System.Posix.Unistd (fileSynchronise)
 
 
@@ -33,88 +37,8 @@ import           System.Posix.Unistd (fileSynchronise)
 
 
 
--- | Return the given filepath if it is able to break the open.lock file
-ableToBreakLock :: FilePath -> IO (Either StoreError FilePath)
-ableToBreakLock fp = do
-  !fileExists <- isFile fp
-  if fileExists
-     then do
-       ePid <- readMay <$> readFile (encodeString fp) :: IO (Maybe Int)
-       case ePid of
-         Just pid -> do
-           exists <- processExists pid
-           return $
-             if exists
-                then Left . StoreIOError $ "Process holding open.lock is already running"
-                else Right fp
-         Nothing -> return . Left . StoreIOError $ "Unable to parse open.lock"
-     else return $ Right fp
 
 
-
-
-
-
-
--- | Catch all errors that allow the lock to still be taken
-ableToBreakLockError :: IOError -> Bool
-ableToBreakLockError = isDoesNotExistError
-
-{- Old version of 'ableToBreakLockError'
-
-ableToBreakLockError :: IOError -> Bool
-ableToBreakLockError e
-  | isAlreadyInUseError e = False
-  | isDoesNotExistError e = True
-  | isPermissionError e = False
-  | otherwise = False
-
--}
-
-
-
-
-
-
-
--- | Create a lock file with the current process pid in it
--- The lock file should already be empty or non existent
-createLock :: FilePath -> IO (Either StoreError ())
-createLock fp = do
-  pid <- getProcessID
-  catch (Right <$> writeLockFile pid) showError
-  where showError :: IOException -> IO (Either StoreError ())
-        showError         = return . Left . StoreIOError . show 
-        writeLockFile pid =  withFile fp
-                                      WriteMode
-                                     (\lockHandle -> do
-                                         hPrint lockHandle pid
-                                         hFlush lockHandle
-                                         fileSynchronise =<< handleToFd lockHandle
-                                         ) 
-
-
-
-
-
--- | Attempt to create a lock inside of the given filepath
-attemptTakeLock :: FilePath -> IO (Either StoreError ())
-attemptTakeLock baseFP = do
-  allowBreak <- ableToBreakLock lockFilePath
-  res        <- sequence $ createLock <$> allowBreak
-  return . join $ res
-  where
-   lockFilePath  = baseFP </> (fromText "open.lock")
-
-
-
-
--- | release the lock for a given store
-releaseFileLock :: SimpleStore st -> IO ()
-releaseFileLock store = do
-  fp     <- (</> fromText "open.lock") <$> (atomically . readTVar . storeDir $ store)
-  exists <- isFile fp
-  when exists $ removeFile fp
 
 
 
