@@ -144,12 +144,11 @@ checkpoint fsync store = do
 
           updateIfWritten  l@(Left s) _       _       = putStrLn "updateIfWritten error: " *> print s *> pure l
           updateIfWritten  _ version' fHandle = do
-            oHandle <- atomically $ do            
-                         _         <- writeTVar tVersion version'
-                         oldHandle <- takeTMVar tHandle
-                         _         <- putTMVar  tHandle fHandle
-                         return oldHandle
-            _       <- withFsync fsync oHandle                         
+            oHandle <- atomically $ writeTVar tVersion version' *>
+                                    takeTMVar tHandle                                                  
+
+            _       <- withFsync fsync oHandle
+            _       <- atomically $ putTMVar tHandle fHandle
             _       <- hClose oHandle
             _       <- hFlush fHandle
             return $ Right ()
