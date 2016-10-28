@@ -150,7 +150,6 @@ checkpoint fsync store = do
             _       <- withFsync fsync oHandle
             _       <- atomically $ putTMVar tHandle fHandle
             _       <- hClose oHandle
-            _       <- hFlush fHandle
             return $ Right ()
 
 
