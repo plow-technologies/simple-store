@@ -75,7 +75,7 @@ openNewestStore f (x:xs) = do
                          IOException ->                           -- io exceptions
                          IO (Either StoreError b)
          hIOException func ys e = hPrint stderr  e >>
-                                  openNewestStore func ys
+                                  openNewestStore func (Prelude.filter (not . (== x)) ys)
 
 -- Attempt to open a store from a filepath
 createStoreFromFilePath :: (Serialize st) => FilePath -> IO (Either StoreError (SimpleStore st))
