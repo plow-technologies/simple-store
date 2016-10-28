@@ -84,10 +84,18 @@ createStoreFromFilePath fp = do
   eFHandle <- try (openFile fp ReadWriteMode ) :: IO (Either SomeException Handle)
   eFConts  <- (either (return . Left) (try . BS.hGetContents) eFHandle) 
   putStrLn "createStoreFromFilepath"
-  sequence $ toStoreIOError  $ createStore (directory fp)  <$> toStringError eFHandle <*> 
+  sequence $ toStoreIOError  $ createStore (directory fp)  <$> toStringErrorWithTag ("createStoreFromFilePath error: " ++  show fp ++ " ") eFHandle <*> 
                                                                eVersion               <*> 
-                                                               (toStringError eFConts >>= decode )
+                                                               (toStringErrorWithTag ("createStoreFromFilePath error: " ++  show fp ++ " ") eFConts >>= decode )
 
+
+
+
+toStoreIOErrorWithTag :: String -> Either String c -> Either StoreError c
+toStoreIOErrorWithTag str = first (StoreIOError . (++ str) . show)
+
+toStringErrorWithTag :: String -> Either SomeException c -> Either String c
+toStringErrorWithTag str= first ((++ str) . show)
 
 toStoreIOError :: Either String c -> Either StoreError c
 toStoreIOError = first (StoreIOError . show)
