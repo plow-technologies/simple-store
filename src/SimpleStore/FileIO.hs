@@ -68,7 +68,7 @@ openNewestStore f (x:xs) = do
   case res of
     Left e -> putStrLn "errors found and written to errors.log" >>
               (writeFile "errors.log" ("filePath:" ++  show x ++ "\n error: " ++ show e))
-              >> openNewestStore f xs
+              >> openNewestStore f (Prelude.filter (not . (== x)) xs)
     _ -> return res
   where  hIOException :: (FilePath -> IO (Either StoreError b)) ->  -- createNewStore
                          [FilePath] ->                            -- list of files to try                         
