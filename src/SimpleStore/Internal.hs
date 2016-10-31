@@ -29,7 +29,8 @@ import           SimpleStore.Types
 import           System.Posix.Process
 import           System.Posix.Types
 import           System.IO                    (Handle, hClose)
-
+import           System.IO.Error (tryIOError)
+import           System.Posix.IO      (handleToFd,closeFd)
 
 
 putWriteStore :: SimpleStore st -> st -> IO ()
@@ -66,12 +67,16 @@ getVersionNumber fp = second fst $ join $ decimal <$> eTextFp
 -- Create a store from it's members. Just creates the necessary TMVars/TVars
 createStore :: FilePath -> Handle -> Int -> st -> IO (SimpleStore st)
 createStore fp fHandle version st = do
-  sState   <- newTVarIO st
+  sState   <- newTVarIO  st
   sLock    <- newTMVarIO StoreLock
   sHandle  <- newTMVarIO fHandle
-  sVersion <- newTVarIO version
-  sFp      <- newTVarIO fp
-  return $ SimpleStore sFp sState sLock sHandle sVersion
+  sVersion <- newTVarIO  version
+  sFp      <- newTVarIO  fp
+  return $ SimpleStore { storeDir               = sFp
+                       , storeState             = sState
+                       , storeLock              = sLock
+                       , storeHandle            = sHandle
+                       , storeCheckpointVersion = sVersion}
 
 -- Checks the extension of a filepath for ".st"
 isState :: FilePath -> Bool
@@ -80,5 +85,22 @@ isState fp = extension fp == Just "st"
 -- Release the handle for a simplestore state file
 closeStoreHandle :: SimpleStore st -> IO ()
 closeStoreHandle store = do
-  fHandle <- atomically . readTMVar . storeHandle $ store
-  hClose fHandle
+  fHandle <- atomically . takeTMVar . storeHandle $ store
+  closeRslt <- tryIOError $ hClose fHandle
+  case closeRslt of
+    (Left e)   -> (putStrLn "closeStoreHandle error: ") >> (print e) >> 
+                  (putStrLn "trying to close FD") >> tryClosingFD fHandle
+    (Right _)  -> return ()
+
+-- |Take a Handle and try to close the internal file descriptor (thus closing the handle automatically).
+
+tryClosingFD :: Handle -> IO ()
+tryClosingFD handle' = do
+  putStrLn "tryClosingFD Handle: " >> print handle'
+  eitherFD         <- tryIOError $ handleToFd handle'
+  putStrLn "tryClosingFD FD: " >> print eitherFD
+  eitherClosedFD <- closeFd `traverse` eitherFD
+  either notClosed close eitherClosedFD
+    where
+      close  _    = return ()
+      notClosed e = putStrLn "tryClosingFD could not close FD:" >> print e

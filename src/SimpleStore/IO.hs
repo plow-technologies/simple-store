@@ -72,7 +72,7 @@ openSimpleStore fp = do
                                     if lastTouchExists 
                                     then  do
                                      fpExpected <- do                                                   
-                                              let stringFilePath = encodeString (lastTouch dir) :: String
+                                              let stringFilePath = encodeString (lastTouch dir) :: String -- Create the full filepath for last.touch
                                               binaryContent <- try $ B.readFile stringFilePath :: IO (Either SomeException B.ByteString)
                                               -- Decode bytestring as text
                                               case decodeUtf8' <$> binaryContent of                                                     

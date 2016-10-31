@@ -6,7 +6,8 @@ module SimpleStoreSpec (main
                        , makeTestStore) where
 
 import           Control.Applicative
-import           Control.Concurrent        (threadDelay)
+import           Control.Concurrent        (threadDelay,forkIO)
+import           Control.Monad (void)
 import           Control.Concurrent.Async
 import           Control.Concurrent.STM
 -- import           Control.Concurrent.STM.TMVar
@@ -64,6 +65,22 @@ corruptOneState = do
   let corruption_string = BS.pack [1,2,3,4]
   BS.writeFile (Text.unpack val) corruption_string
 
+
+-- | Purposefully corrupt the file last touched by the system
+emptyOneState :: IO ()
+emptyOneState = do
+  let dir = "test-states"
+  lst <- listDirectory dir
+  let (fp:_) = sortBy (compare `on` lexicalFirstChar) $
+                     filter (\fp' -> fp' /= "test-states/open.lock" ) $ lst
+
+      lexicalFirstChar j = Prelude.take 1 . encodeString $ j
+
+  putStrLn (show fp)
+  val <-  Text.readFile "test-states/last.touch"
+  let corruption_string = BS.pack []
+  BS.writeFile (Text.unpack val) corruption_string
+
 makeTestStore  :: IO (Either StoreError (SimpleStore Int),
                    Filesystem.Path.FilePath,
                    Int,
@@ -76,6 +93,23 @@ makeTestStore = do
    return (eStore,dir,x,workingDir)
 
 
+forkCreateCheckpoints  :: (Traversable t, S.Serialize st) =>  t (SimpleStore st) -> IO ()
+forkCreateCheckpoints eStore = do
+  _ <- forkIO $ void $  sequence $ createCheckpoint <$> eStore
+  _ <- forkIO $ void $  sequence $ createCheckpointImmediate <$> eStore
+  _ <- forkIO $ void $  sequence $ createCheckpointImmediate <$> eStore
+  _ <- forkIO $ void $  sequence $ createCheckpointImmediate <$> eStore
+  _ <- forkIO $ void $  sequence $ createCheckpointImmediate <$> eStore
+  _ <- forkIO $ void $  sequence $ createCheckpointImmediate <$> eStore
+  _ <- forkIO $ void $  sequence $ createCheckpointImmediate <$> eStore
+  _ <- forkIO $ void $  sequence $ createCheckpointImmediate <$> eStore
+  _ <- forkIO $ void $  sequence $ createCheckpointImmediate <$> eStore
+  _ <- forkIO $ void $  sequence $ createCheckpointImmediate <$> eStore
+  _ <- forkIO $ void $  sequence $ createCheckpointImmediate <$> eStore
+  _ <- forkIO $ void $  sequence $ createCheckpointImmediate <$> eStore
+  _ <- forkIO $ void $  sequence $ createCheckpointImmediate <$> eStore
+  _ <- forkIO $ void $  sequence $ createCheckpoint <$> eStore
+  return ()
 spec :: Spec
 spec = do
 
@@ -91,14 +125,14 @@ spec = do
       -- workingDir <- getWorkingDirectory
       -- eStore <- makeSimpleStore dir x
       (eStore,dir,x,workingDir)  <- makeTestStore
-      _ <- sequence $ getSimpleStore   <$> eStore
-      _ <- sequence $ createCheckpoint <$> eStore
-      _ <- sequence $ createCheckpoint <$> eStore
-      _ <- sequence $ createCheckpoint <$> eStore
-      _ <- sequence $ createCheckpoint <$> eStore
-      _ <- sequence $ createCheckpoint <$> eStore
-      _ <- sequence $ createCheckpoint <$> eStore
-      _ <- sequence $ closeSimpleStore <$> eStore
+      _ <- forkIO $ void $ sequence $ getSimpleStore   <$> eStore
+      _ <- forkIO $ void $  sequence $ createCheckpoint <$> eStore
+      _ <- forkIO $ void $  sequence $ createCheckpoint <$> eStore
+      _ <- forkIO $ void $  sequence $ createCheckpoint <$> eStore
+      _ <- forkIO $ void $  sequence $ createCheckpoint <$> eStore
+      _ <- forkIO $ void $  sequence $ createCheckpoint <$> eStore
+      _ <- forkIO $ void $  sequence $ createCheckpoint <$> eStore
+      _ <- forkIO $ void $  sequence $ closeSimpleStore <$> eStore
       eStore' <- openSimpleStore dir
       case eStore' of
         (Left err) -> fail ("Unable to open local state" ++ show err)
@@ -169,7 +203,7 @@ spec = do
       eStore  <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))
       _       <- getSimpleStore `traverse` eStore
       _       <- (flip modifySimpleStore (return . (1 +)) ) `traverse` eStore
-      _       <- createCheckpoint `traverse` eStore
+      _       <- createCheckpointImmediate `traverse` eStore
       ey      <- getSimpleStore `traverse` eStore
       _       <- closeSimpleStore `traverse` eStore
       eStore' <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))
@@ -179,11 +213,34 @@ spec = do
       (isRight' ex') `shouldBe` (Right True)
       ex' `shouldBe` ey
 
+
+  describe "blank store file should open something (though may not be correct)" $ do
+    it "Should corrupt a file and then open an older file (with possible wrong state)" $ do
+          let dir = "test-states"
+          eStore <- openSimpleStore dir :: IO (Either StoreError (SimpleStore (BoundInt)))
+          ex <- getSimpleStore `traverse` eStore
+          _ <- (flip modifySimpleStore (return . (1 +)) ) `traverse` eStore
+          _ <- threadDelay (1 * 10^(6::Integer))
+          _ <- createCheckpointImmediate `traverse` eStore
+          _ <- forkCreateCheckpoints eStore
+          _ <- closeSimpleStore `traverse` eStore
+          putStrLn "empty"
+          _ <- emptyOneState
+          putStrLn "done"
+          eStore' <- openSimpleStore dir :: IO (Either StoreError (SimpleStore BoundInt))
+          ex'     <- getSimpleStore   `traverse` eStore'
+          _       <- closeSimpleStore `traverse` eStore'
+          _       <- putStrLn (show ex')
+
+          ex'           `shouldBe` ex'
+          (isRight' ex') `shouldBe` (Right True)
+
   describe "purposefully corrupt file" $ do
     it "Should corrupt a file and then open the old file and read it" $ do
           let dir = "test-states"
           eStore <- openSimpleStore dir :: IO (Either StoreError (SimpleStore (BoundInt)))
           ex <- getSimpleStore `traverse` eStore
+          _ <- (flip modifySimpleStore (return . (const 1)) ) `traverse` eStore
           _ <- (flip modifySimpleStore (return . (1 +)) ) `traverse` eStore
           _ <- threadDelay (1 * 10^(6::Integer))
           _ <- createCheckpoint `traverse` eStore
@@ -198,10 +255,11 @@ spec = do
 
           ex'           `shouldBe` ex
           (isRight' ex') `shouldBe` (Right True)
-            where
-              isRight' (Right _ )  = Right True
-              isRight' (Left  s )  = Left s
 
 
 
+-- Helper function for test conditions
 
+isRight' :: Either a t -> Either a Bool
+isRight' (Right _ )  = Right True
+isRight' (Left  s )  = Left s

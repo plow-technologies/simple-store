@@ -10,14 +10,15 @@ module SimpleStore.FileIO ( makeAbsoluteFp
                           , checkpoint
                           , WithFsync(..)) where
 
-
+import Control.Concurrent (forkIO,threadDelay)
 import           Control.Concurrent.STM ( readTVarIO
                                          , writeTVar
                                          , putTMVar
                                          , takeTMVar
-                                         , atomically)
+                                         , atomically
+                                          )
 import           Control.Exception (catch, IOException, try, SomeException)
-import           Control.Monad             hiding (sequence)
+import           Control.Monad             (return,(>>),when,fail,(>>=))
 import           Data.Bifunctor (first)
 import qualified Data.ByteString           as BS
 import           Data.Serialize (Serialize,decode,encode)
@@ -39,7 +40,7 @@ import           Filesystem.Path.CurrentOS ( FilePath
                                              , encodeString
                                              , absolute)
 import           Prelude                   (Either (..)
-                                           ,(.),($),(++),show, Bool(..)
+                                           ,(.),($),(++),show, Bool(..),(^),(*)
                                            ,print,mod,(/=),(*>),String,IO
                                            ,otherwise,putStrLn,appendFile,filter
                                            ,not,(==),(<$>),(+),either,(<*>),Int,
@@ -150,7 +151,8 @@ withFsyncCheck Fsync  handle'  = do
   fd <- handleToFd handle'  
   putStrLn "withFsyncCheck FD: " >> print fd
   eitherE <- tryIOError (fileSynchronise fd) 
-  _       <- closeFd fd
+  forkIO $ threadDelay (10 * 10^6) >> (closeFd fd)
+
   case eitherE of
     (Left e)  -> print "withFsyncCheck Failure: " >> print e
     (Right _) -> return ()
@@ -169,21 +171,20 @@ checkpoint fsync store = do
       !encodedState       = encode state              :: BS.ByteString    
       newFileName         =  ( Data.Text.append ( pack.show   $ newVersion )
                                                   checkpointBaseFileName   )
+
+
       oldFileName         =  ( Data.Text.append ( pack.show   $ oldVersion )
                                                   checkpointBaseFileName   )
       newCheckpointPath
         | oldFileName /= newFileName = fp </> fromText  newFileName
         | otherwise                  = error "old filename and new file name must never match"
 
-
   BS.putStrLn encodedState
   !newHandle <- openFile newCheckpointPath WriteMode -- new checkpoint creation
-
-
   !eFileRes <- catch (Right <$> BS.hPut newHandle encodedState)
                      (return . Left . catchStoreError)
                
-  eVal <- updateIfWritten eFileRes newVersion newHandle  
+  eVal <- updateIfWritten eFileRes newVersion newHandle 
   _    <- writeNewLastTouchValue fp newCheckpointPath -- want to write after we know everything worked
   return eVal
   where
@@ -193,14 +194,13 @@ checkpoint fsync store = do
         tHandle  = storeHandle            store
 
         updateIfWritten  l@(Left s) _       _       = putStrLn "updateIfWritten error: " *> print s *> pure l
-        updateIfWritten  _ version' newHandle = do
-          oldHandle <- atomically $ writeTVar tVersion version' *>
-                                           takeTMVar tHandle                                                  
-          let handlesEqual = oldHandle == newHandle
-          when handlesEqual (putStrLn "HANDLES SHOULDN'T BE EQUAL" ) 
-          _       <- withFsyncCheck fsync oldHandle
-          _       <- atomically $ putTMVar tHandle newHandle            
-          return $ Right ()
+        updateIfWritten  _ version' newHandle       = do
+         oldHandle <- atomically $ writeTVar tVersion version' *>
+                                          takeTMVar tHandle                                                  
+
+         _       <- withFsyncCheck fsync oldHandle
+         _       <- atomically $ putTMVar tHandle newHandle
+         return $ Right ()
 
 
 
