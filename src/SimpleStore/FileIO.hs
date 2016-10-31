@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 module SimpleStore.FileIO ( makeAbsoluteFp
                           , openNewestStore
                           , initializeDirectory
@@ -9,24 +10,48 @@ module SimpleStore.FileIO ( makeAbsoluteFp
                           , checkpoint
                           , WithFsync(..)) where
 
-import           Control.Applicative
-import           Control.Concurrent.STM
-import           Control.Exception
+
+import           Control.Concurrent.STM ( readTVarIO
+                                         , writeTVar
+                                         , putTMVar
+                                         , takeTMVar
+                                         , atomically)
+import           Control.Exception (catch, IOException, try, SomeException)
 import           Control.Monad             hiding (sequence)
-import           Data.Bifunctor
+import           Data.Bifunctor (first)
 import qualified Data.ByteString           as BS
-import           Data.Serialize
-import           Data.Text
+import           Data.Serialize (Serialize,decode,encode)
+import           Data.Text (append,Text,pack)
 import qualified Data.Text.IO as Text
-import           Data.Traversable
-import           Filesystem                hiding (readFile, writeFile)
-import           Filesystem.Path
-import           Filesystem.Path.CurrentOS hiding (decode, encode)
-import           Prelude                   hiding (FilePath, sequence)
+import           Data.Traversable (sequence,traverse)
+import           Filesystem                ( openFile
+                                           , IOMode(..)
+                                           , Handle
+                                           , isDirectory
+                                           , createDirectory
+                                           , getWorkingDirectory)
+
+import           Filesystem.Path.CurrentOS ( FilePath
+                                             , filename
+                                             , (</>)
+                                             , directory
+                                             , fromText
+                                             , encodeString
+                                             , absolute)
+import           Prelude                   (Either (..)
+                                           ,(.),($),(++),show, Bool(..)
+                                           ,print,mod,(/=),(*>),String,IO
+                                           ,otherwise,putStrLn,appendFile,filter
+                                           ,not,(==),(<$>),(+),either,(<*>),Int,
+                                           error,pure)
 import           SimpleStore.Internal
-import           SimpleStore.Types
+import           SimpleStore.Types (StoreError(..), SimpleStore(..))
 import           System.IO                 (hClose,hFlush,hPrint,stderr)
-import           System.IO.Error
+import           System.IO.Error ( IOError(..)
+                                 , isAlreadyInUseError
+                                 , isDoesNotExistError
+                                 , isPermissionError
+                                 , tryIOError)
 import           System.Posix.IO      (handleToFd,closeFd)
 import           System.Posix.Unistd (fileSynchronise)
 
@@ -67,7 +92,7 @@ openNewestStore f (x:xs) = do
   res <- catch (f x) (hIOException f xs)
   case res of
     Left e -> putStrLn "errors found and written to errors.log" >>
-              (writeFile "errors.log" ("filePath:" ++  show x ++ "\n error: " ++ show e))
+              (appendFile "errors.log" ("filePath:" ++  show x ++ "\n error: " ++ show e))
               >> openNewestStore f (Prelude.filter (not . (== x)) xs)
     _ -> return res
   where  hIOException :: (FilePath -> IO (Either StoreError b)) ->  -- createNewStore
@@ -84,10 +109,13 @@ createStoreFromFilePath fp = do
   eFHandle <- try (openFile fp ReadWriteMode ) :: IO (Either SomeException Handle)
   eFConts  <- (either (return . Left) (try . BS.hGetContents) eFHandle) 
   putStrLn "createStoreFromFilepath"
-  sequence $ toStoreIOError  $ createStore (directory fp)  <$> toStringErrorWithTag ("createStoreFromFilePath error: " ++  show fp ++ " ") eFHandle <*> 
-                                                               eVersion               <*> 
-                                                               (toStringErrorWithTag ("createStoreFromFilePath error: " ++  show fp ++ " ") eFConts >>= decode )
+  eitherStore <- sequence $ toStoreIOError  $ createStore (directory fp)  <$> toStringErrorWithTag ("createStoreFromFilePath handle error: "    ++  show fp ++ " ") eFHandle <*> 
+                                                                              eVersion               <*> 
+                                                                              (toStringErrorWithTag ("createStoreFromFilePath contents error: " ++  show fp ++ " ") eFConts >>= decode )
 
+  case eitherStore of
+    r@(Right _)   -> return r
+    l@(Left err)  -> hClose `traverse` eFHandle *> return l
 
 
 
@@ -112,15 +140,19 @@ checkpointBaseFileName = "checkpoint.st"
 
 
 -- | If using Fsync on a file is enabled then run it on the given handle
+
 data WithFsync = NoFsync | Fsync
 
-withFsync :: WithFsync -> Handle -> IO ()
-withFsync NoFsync _       = return ()
-withFsync Fsync  oHandle  = do
-  fd <- handleToFd oHandle  
-  eitherE <- tryIOError ((fileSynchronise fd) >> closeFd fd)
+withFsyncCheck :: WithFsync -> Handle -> IO ()
+withFsyncCheck NoFsync handle' = hClose handle' *> return ()
+withFsyncCheck Fsync  handle'  = do
+  putStrLn "withFsyncCheck Handle: " >> print handle'
+  fd <- handleToFd handle'  
+  putStrLn "withFsyncCheck FD: " >> print fd
+  eitherE <- tryIOError (fileSynchronise fd) 
+  _       <- closeFd fd
   case eitherE of
-    (Left e)  -> print e
+    (Left e)  -> print "withFsyncCheck Failure: " >> print e
     (Right _) -> return ()
 
 
@@ -129,39 +161,46 @@ withFsync Fsync  oHandle  = do
 checkpoint :: (Serialize st) => WithFsync -> SimpleStore st -> IO (Either StoreError ())
 checkpoint fsync store = do
 
-  !fp         <- readTVarIO . storeDir $ store
-  !state      <- readTVarIO tState
-  !oldVersion <- readTVarIO tVersion
+  !fp         <- readTVarIO . storeDir    $ store
+  !state      <- readTVarIO . storeState  $ store
+  !oldVersion <- readTVarIO   tVersion
 
-  let !newVersion         = (oldVersion + 1) `mod` 5
-      !encodedState       = encode state      
+  let !newVersion         = (oldVersion + 1) `mod` 5  :: Int
+      !encodedState       = encode state              :: BS.ByteString    
       newFileName         =  ( Data.Text.append ( pack.show   $ newVersion )
-                                                  checkpointBaseFileName   )                    
-      checkpointPath      = fp </> fromText  newFileName
+                                                  checkpointBaseFileName   )
+      oldFileName         =  ( Data.Text.append ( pack.show   $ oldVersion )
+                                                  checkpointBaseFileName   )
+      newCheckpointPath
+        | oldFileName /= newFileName = fp </> fromText  newFileName
+        | otherwise                  = error "old filename and new file name must never match"
 
 
+  BS.putStrLn encodedState
+  !newHandle <- openFile newCheckpointPath WriteMode -- new checkpoint creation
 
-  newHandle <- openFile checkpointPath WriteMode
-  _         <- Text.writeFile (encodeString $ fp </> "last.touch")  (pack.encodeString $ checkpointPath)
+
   !eFileRes <- catch (Right <$> BS.hPut newHandle encodedState)
                      (return . Left . catchStoreError)
                
-  updateIfWritten eFileRes newVersion newHandle  
-    where
-      
-          tState   = storeState             store
-          tVersion = storeCheckpointVersion store
-          tHandle  = storeHandle            store
+  eVal <- updateIfWritten eFileRes newVersion newHandle  
+  _    <- writeNewLastTouchValue fp newCheckpointPath -- want to write after we know everything worked
+  return eVal
+  where
+        writeNewLastTouchValue fp newCheckpointPath = Text.writeFile (encodeString $ fp </> "last.touch")
+                                                                     (pack.encodeString $ newCheckpointPath)
+        tVersion = storeCheckpointVersion store
+        tHandle  = storeHandle            store
 
-          updateIfWritten  l@(Left s) _       _       = putStrLn "updateIfWritten error: " *> print s *> pure l
-          updateIfWritten  _ version' fHandle = do
-            oHandle <- atomically $ writeTVar tVersion version' *>
-                                    takeTMVar tHandle                                                  
-
-            _       <- withFsync fsync oHandle
-            _       <- atomically $ putTMVar tHandle fHandle
-            _       <- hClose oHandle
-            return $ Right ()
+        updateIfWritten  l@(Left s) _       _       = putStrLn "updateIfWritten error: " *> print s *> pure l
+        updateIfWritten  _ version' newHandle = do
+          oldHandle <- atomically $ writeTVar tVersion version' *>
+                                           takeTMVar tHandle                                                  
+          let handlesEqual = oldHandle == newHandle
+          when handlesEqual (putStrLn "HANDLES SHOULDN'T BE EQUAL" ) 
+          _       <- withFsyncCheck fsync oldHandle
+          _       <- atomically $ putTMVar tHandle newHandle            
+          return $ Right ()
 
 
 
