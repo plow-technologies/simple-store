@@ -66,11 +66,11 @@ getVersionNumber fp = second fst $ join $ decimal <$> eTextFp
 -- Create a store from it's members. Just creates the necessary TMVars/TVars
 createStore :: FilePath -> Handle -> Int -> st -> IO (SimpleStore st)
 createStore fp fHandle version st = do
-  sState <- newTVarIO st
-  sLock <- newTMVarIO StoreLock
-  sHandle <- newTMVarIO fHandle
+  sState   <- newTVarIO st
+  sLock    <- newTMVarIO StoreLock
+  sHandle  <- newTMVarIO fHandle
   sVersion <- newTVarIO version
-  sFp <- newTVarIO fp
+  sFp      <- newTVarIO fp
   return $ SimpleStore sFp sState sLock sHandle sVersion
 
 -- Checks the extension of a filepath for ".st"

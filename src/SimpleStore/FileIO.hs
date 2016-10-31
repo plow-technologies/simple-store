@@ -117,9 +117,12 @@ data WithFsync = NoFsync | Fsync
 withFsync :: WithFsync -> Handle -> IO ()
 withFsync NoFsync _       = return ()
 withFsync Fsync  oHandle  = do
-  fd <- handleToFd oHandle
-  fileSynchronise fd
-  closeFd fd
+  fd <- handleToFd oHandle  
+  eitherE <- tryIOError ((fileSynchronise fd) >> closeFd fd)
+  case eitherE of
+    (Left e)  -> print e
+    (Right _) -> return ()
+
 
 -- | Create a checkpoint for a store. This attempts to write the state to disk
 -- If successful it updates the version, releases the old file handle, and deletes the old file
