@@ -20,22 +20,22 @@ import Control.Concurrent.STM.TVar (readTVarIO
        
 import Control.Monad hiding (sequence)
 import Control.Monad.STM (atomically)
-import Control.Exception (SomeException, try)
+
 import Data.Function (on)
 import Data.List (sortBy)
 import qualified Data.Serialize as S
 import Data.Text hiding (filter, foldl, map, maximum, stripPrefix)
 
-import Data.Text.Encoding (decodeUtf8')
-import qualified Data.ByteString as B
+
+
 
 import Filesystem
        (isDirectory, getModified, listDirectory, isFile, writeFile) 
 import Filesystem.Path.CurrentOS
-       (FilePath, (</>), encodeString, fromText)
+       (FilePath, (</>),  fromText)
 import Prelude
        (IO, (.), ($), Either(..), (<$>), snd, fst, compare, traverse,
-        filter, null, pure, last, String, putStrLn, (++), show, reverse,
+        filter, null, pure, last, putStrLn, (++), show, reverse,
         (+), either,otherwise)
 
 import Data.Time (UTCTime)

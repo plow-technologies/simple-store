@@ -24,7 +24,7 @@ import Data.Text (append, Text, pack)
 import qualified Data.Text.IO as Text
 import Data.Traversable (sequence, traverse)
 import Filesystem
-       (openFile, IOMode(..), Handle,isFile, isDirectory, createDirectory,
+       (openFile, IOMode(..), Handle, isDirectory, createDirectory,
         getWorkingDirectory)
 
 import Filesystem.Path.CurrentOS
@@ -192,16 +192,16 @@ readLastTouch dir failoverAction = performRead >>=
                                    (evaluateResult.decodeResult)
 
   where
-    lastTouch dir = dir </> "last.touch"
+    lastTouch = dir </> "last.touch"
     decodeResult               = (>>= first decodeFileError  . decodeUtf8') . first readFileError
     
     evaluateResult (Left  err) = recordError err *> failoverAction
     evaluateResult (Right txt) = return . fromText $ txt
-    recordError     e = appendFile "errors.log" ("filePath:" ++ (show . lastTouch $ dir) ++ "\n error: " ++ show e)
     
+    recordError     e = appendFile "errors.log" ("filePath:" ++ show  lastTouch  ++ "\n error: " ++ show e)    
     readFileError   e =  "error reading file "         ++ show e
     decodeFileError e =  "error parsing text of file " ++ show e
     
     performRead = do
-           let stringFilePath = encodeString (lastTouch dir) :: String -- Create the full filepath for last.touch
+           let stringFilePath = encodeString lastTouch  :: String -- Create the full filepath for last.touch
            try $ BS.readFile stringFilePath :: IO (Either SomeException BS.ByteString)
