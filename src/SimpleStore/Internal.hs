@@ -69,13 +69,11 @@ createStore :: FilePath -> Handle -> Int -> st -> IO (SimpleStore st)
 createStore fp fHandle version st = do
   sState   <- newTVarIO  st
   sLock    <- newTMVarIO StoreLock
-  sHandle  <- newTMVarIO fHandle
   sVersion <- newTVarIO  version
   sFp      <- newTVarIO  fp
   return $ SimpleStore { storeDir               = sFp
                        , storeState             = sState
                        , storeLock              = sLock
-                       , storeHandle            = sHandle
                        , storeCheckpointVersion = sVersion}
 
 -- Checks the extension of a filepath for ".st"
@@ -84,13 +82,13 @@ isState fp = extension fp == Just "st"
 
 -- Release the handle for a simplestore state file
 closeStoreHandle :: SimpleStore st -> IO ()
-closeStoreHandle store = do
-  fHandle <- atomically . takeTMVar . storeHandle $ store
-  closeRslt <- tryIOError $ hClose fHandle
-  case closeRslt of
-    (Left e)   -> (putStrLn "closeStoreHandle error: ") >> (print e) >> 
-                  (putStrLn "trying to close FD") >> tryClosingFD fHandle
-    (Right _)  -> return ()
+closeStoreHandle store = return () -- do
+  -- storeFd   <- atomically . takeTMVar . storeHandle $ store
+  -- closeRslt <- tryIOError $ closeFd `traverse` storeFd
+  -- case closeRslt of
+  --   (Left e)   -> (putStrLn "closeStoreHandle error: ") >> (print e)
+                  
+  --   (Right _)  -> atomically . putTMVar (storeHandle store) $ ClosedFd
 
 -- |Take a Handle and try to close the internal file descriptor (thus closing the handle automatically).
 

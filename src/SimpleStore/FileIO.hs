@@ -39,7 +39,7 @@ import           Filesystem.Path.CurrentOS ( FilePath
                                              , fromText
                                              , encodeString
                                              , absolute)
-import           Prelude                   (Either (..)
+import           Prelude                   (Either (..),Maybe(..)
                                            ,(.),($),(++),show, Bool(..),(^),(*)
                                            ,print,mod,(/=),(*>),String,IO
                                            ,otherwise,putStrLn,appendFile,filter
@@ -54,6 +54,7 @@ import           System.IO.Error ( IOError(..)
                                  , isPermissionError
                                  , tryIOError)
 import           System.Posix.IO      (handleToFd,closeFd)
+import           System.Posix.Types      (Fd)
 import           System.Posix.Unistd (fileSynchronise)
 
 
@@ -145,28 +146,26 @@ checkpointBaseFileName = "checkpoint.st"
 data WithFsync = NoFsync | Fsync
 
 withFsyncCheck :: WithFsync -> Handle -> IO ()
-withFsyncCheck NoFsync handle' = hClose handle' *> return ()
-withFsyncCheck Fsync  handle'  = do
-  putStrLn "withFsyncCheck Handle: " >> print handle'
-  fd <- handleToFd handle'  
+withFsyncCheck NoFsync handle' = hClose handle'
+withFsyncCheck Fsync   handle'  = do
+  fd <- handleToFd handle'
   putStrLn "withFsyncCheck FD: " >> print fd
-  eitherE <- tryIOError (fileSynchronise fd) 
-  forkIO $ threadDelay (10 * 10^6) >> (closeFd fd)
-
-  case eitherE of
-    (Left e)  -> print "withFsyncCheck Failure: " >> print e
+  eitherE <-  tryIOError (fileSynchronise fd) 
+  eitherE2 <- tryIOError (closeFd fd)
+  case concatShow <$> eitherE <*> eitherE2 of
+    (Left e)  -> print "withFsyncCheck Failure: " >> print e 
     (Right _) -> return ()
 
+concatShow x y =  (show x) ++  (show y)
 
 -- | Create a checkpoint for a store. This attempts to write the state to disk
 -- If successful it updates the version, releases the old file handle, and deletes the old file
 checkpoint :: (Serialize st) => WithFsync -> SimpleStore st -> IO (Either StoreError ())
 checkpoint fsync store = do
-
   !fp         <- readTVarIO . storeDir    $ store
   !state      <- readTVarIO . storeState  $ store
   !oldVersion <- readTVarIO   tVersion
-
+  
   let !newVersion         = (oldVersion + 1) `mod` 5  :: Int
       !encodedState       = encode state              :: BS.ByteString    
       newFileName         =  ( Data.Text.append ( pack.show   $ newVersion )
@@ -183,23 +182,19 @@ checkpoint fsync store = do
   !newHandle <- openFile newCheckpointPath WriteMode -- new checkpoint creation
   !eFileRes <- catch (Right <$> BS.hPut newHandle encodedState)
                      (return . Left . catchStoreError)
-               
-  eVal <- updateIfWritten eFileRes newVersion newHandle 
+  eVal <- updateIfWritten eFileRes newVersion 
   _    <- writeNewLastTouchValue fp newCheckpointPath -- want to write after we know everything worked
+  withFsyncCheck fsync newHandle
   return eVal
   where
         writeNewLastTouchValue fp newCheckpointPath = Text.writeFile (encodeString $ fp </> "last.touch")
                                                                      (pack.encodeString $ newCheckpointPath)
         tVersion = storeCheckpointVersion store
-        tHandle  = storeHandle            store
 
-        updateIfWritten  l@(Left s) _       _       = putStrLn "updateIfWritten error: " *> print s *> pure l
-        updateIfWritten  _ version' newHandle       = do
-         oldHandle <- atomically $ writeTVar tVersion version' *>
-                                          takeTMVar tHandle                                                  
 
-         _       <- withFsyncCheck fsync oldHandle
-         _       <- atomically $ putTMVar tHandle newHandle
+        updateIfWritten  l@(Left s)    _       = putStrLn "updateIfWritten error: " *> print s *> pure l
+        updateIfWritten  _             version'        = do
+         _       <- atomically $ writeTVar tVersion version' 
          return $ Right ()
 
 

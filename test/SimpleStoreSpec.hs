@@ -139,6 +139,7 @@ spec = do
         (Right store) -> do
           x' <- getSimpleStore store
           removeTree $ workingDir </> dir
+          _ <- closeSimpleStore store
           x `shouldBe` x'
   describe "Make, close, open, modify, close open, check value" $ do
     it "Should create a new state, close it, then open the state and modify the state, close the state, and finally open it and check the value" $ do
