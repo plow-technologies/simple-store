@@ -10,7 +10,7 @@ module SimpleStore.Internal (
   , getVersionNumber
   , createStore
   , isState
-  , closeStoreHandle
+
 ) where
 
 import           Control.Applicative
@@ -28,9 +28,7 @@ import           Prelude                      hiding (FilePath, sequence)
 import           SimpleStore.Types
 import           System.Posix.Process
 import           System.Posix.Types
-import           System.IO                    (Handle, hClose)
-import           System.IO.Error (tryIOError)
-import           System.Posix.IO      (handleToFd,closeFd)
+
 
 
 putWriteStore :: SimpleStore st -> st -> IO ()
@@ -65,8 +63,8 @@ getVersionNumber fp = second fst $ join $ decimal <$> eTextFp
   where eTextFp = first unpack $ toText fp
 
 -- Create a store from it's members. Just creates the necessary TMVars/TVars
-createStore :: FilePath -> Handle -> Int -> st -> IO (SimpleStore st)
-createStore fp fHandle version st = do
+createStore :: FilePath -> Int -> st -> IO (SimpleStore st)
+createStore fp version st = do
   sState   <- newTVarIO  st
   sLock    <- newTMVarIO StoreLock
   sVersion <- newTVarIO  version
@@ -80,25 +78,3 @@ createStore fp fHandle version st = do
 isState :: FilePath -> Bool
 isState fp = extension fp == Just "st"
 
--- Release the handle for a simplestore state file
-closeStoreHandle :: SimpleStore st -> IO ()
-closeStoreHandle store = return () -- do
-  -- storeFd   <- atomically . takeTMVar . storeHandle $ store
-  -- closeRslt <- tryIOError $ closeFd `traverse` storeFd
-  -- case closeRslt of
-  --   (Left e)   -> (putStrLn "closeStoreHandle error: ") >> (print e)
-                  
-  --   (Right _)  -> atomically . putTMVar (storeHandle store) $ ClosedFd
-
--- |Take a Handle and try to close the internal file descriptor (thus closing the handle automatically).
-
-tryClosingFD :: Handle -> IO ()
-tryClosingFD handle' = do
-  putStrLn "tryClosingFD Handle: " >> print handle'
-  eitherFD         <- tryIOError $ handleToFd handle'
-  putStrLn "tryClosingFD FD: " >> print eitherFD
-  eitherClosedFD <- closeFd `traverse` eitherFD
-  either notClosed close eitherClosedFD
-    where
-      close  _    = return ()
-      notClosed e = putStrLn "tryClosingFD could not close FD:" >> print e
