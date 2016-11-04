@@ -9,6 +9,7 @@ module SimpleStore.FileIO
   , createStoreFromFilePath
   , checkpointBaseFileName
   , checkpoint
+  , readLastTouch
   , WithFsync(..)
   ) where
 
@@ -17,12 +18,13 @@ import Control.Exception (catch, IOException, try, SomeException)
 import Control.Monad (return, (>>), fail, (>>=))
 import Data.Bifunctor (first)
 import qualified Data.ByteString as BS
+import Data.Text.Encoding (decodeUtf8')
 import Data.Serialize (Serialize, decode, encode)
 import Data.Text (append, Text, pack)
 import qualified Data.Text.IO as Text
 import Data.Traversable (sequence, traverse)
 import Filesystem
-       (openFile, IOMode(..), Handle, isDirectory, createDirectory,
+       (openFile, IOMode(..), Handle,isFile, isDirectory, createDirectory,
         getWorkingDirectory)
 
 import Filesystem.Path.CurrentOS
@@ -78,7 +80,6 @@ createStoreFromFilePath fp = do
   eFHandle <-
     try (openFile fp ReadWriteMode) :: IO (Either SomeException Handle)
   eFConts <- (either (return . Left) (try . BS.hGetContents) eFHandle)
-  putStrLn "createStoreFromFilepath"
   eitherStore <-
     sequence $
     toStoreIOError $
@@ -183,3 +184,24 @@ catchStoreError e
   | isDoesNotExistError e = StoreFileNotFound
   | isPermissionError e = StoreFileNotFound
   | otherwise = StoreIOError . show $ e
+
+
+
+readLastTouch :: FilePath -> IO FilePath -> IO FilePath
+readLastTouch dir failoverAction = performRead >>=
+                                   (evaluateResult.decodeResult)
+
+  where
+    lastTouch dir = dir </> "last.touch"
+    decodeResult               = (>>= first decodeFileError  . decodeUtf8') . first readFileError
+    
+    evaluateResult (Left  err) = recordError err *> failoverAction
+    evaluateResult (Right txt) = return . fromText $ txt
+    recordError     e = appendFile "errors.log" ("filePath:" ++ (show . lastTouch $ dir) ++ "\n error: " ++ show e)
+    
+    readFileError   e =  "error reading file "         ++ show e
+    decodeFileError e =  "error parsing text of file " ++ show e
+    
+    performRead = do
+           let stringFilePath = encodeString (lastTouch dir) :: String -- Create the full filepath for last.touch
+           try $ BS.readFile stringFilePath :: IO (Either SomeException BS.ByteString)

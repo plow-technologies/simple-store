@@ -30,7 +30,7 @@ import Data.Text.Encoding (decodeUtf8')
 import qualified Data.ByteString as B
 
 import Filesystem
-       (isDirectory, getModified, listDirectory, isFile, writeFile)
+       (isDirectory, getModified, listDirectory, isFile, writeFile) 
 import Filesystem.Path.CurrentOS
        (FilePath, (</>), encodeString, fromText)
 import Prelude
@@ -91,31 +91,7 @@ openSimpleStore fp = do
       lastTouchExists        <- (isFile . lastTouch) dir
       if lastTouchExists
         then do
-          fpExpected <-
-            do let stringFilePath = encodeString (lastTouch dir) :: String -- Create the full filepath for last.touch
-               binaryContent <-
-                 try $ B.readFile stringFilePath :: IO (Either SomeException B.ByteString)
-               -- Decode bytestring as text
-               case decodeUtf8' <$> binaryContent of
-                 Left err
-                 -- There was an error reading the file
-                  -> do
-                   putStrLn $
-                     "Error reading file " ++ stringFilePath ++ ": " ++ show err
-                   defaultToNewest filesSortedByTouchTime
-                 Right etext
-                 -- Bytes were loaded successfully
-                  ->
-                   case etext of
-                     Left err
-                     -- There was an error decoding the bytes as text
-                      -> do
-                       putStrLn $
-                         "Error parsing text of file " ++
-                         stringFilePath ++ ": " ++ show err
-                       defaultToNewest filesSortedByTouchTime
-                     -- File was parsed as text successfully
-                     Right text -> pure $ fromText text
+          fpExpected <- readLastTouch dir (defaultToNewest filesSortedByTouchTime)
           putStrLn $ "file path: " ++ (show fpExpected)
           openNewestStore
             createStoreFromFilePath
