@@ -14,7 +14,10 @@ module SimpleStore.IO
   , attemptOpenDefault
   ) where
 
-import Control.Concurrent.STM.TVar
+import Control.Concurrent.STM.TVar (readTVarIO
+                                   ,readTVar
+                                   ,writeTVar)
+       
 import Control.Monad hiding (sequence)
 import Control.Monad.STM (atomically)
 import Control.Exception (SomeException, try)
@@ -33,7 +36,7 @@ import Filesystem.Path.CurrentOS
 import Prelude
        (IO, (.), ($), Either(..), (<$>), snd, fst, compare, traverse,
         filter, null, pure, last, String, putStrLn, (++), show, reverse,
-        (+), either)
+        (+), either,otherwise)
 
 import Data.Time (UTCTime)
 import SimpleStore.FileIO
@@ -50,7 +53,7 @@ putSimpleStore store state = withLock store $ putWriteStore store state
 
 -- | Open a simple store from a filepath reading in the newest most valid store
 -- important to the operation of this is the last.touch file.
--- this file tells openSimpleStore where to try and open first.
+-- this file tells openSimpleStore what to try and open first.
 -- it is plain text encoded and updated on every checkpoint.
 openSimpleStore
   :: S.Serialize st
@@ -63,23 +66,29 @@ openSimpleStore fp = do
     else return . Left $ StoreFolderNotFound
   where
     isSTPrefixedFile = isState
-    lastTouch dir = dir </> "last.touch"
+    lastTouch dir    = dir </> "last.touch"
+    
     sortModifiedDateTuples modifiedDates =
       snd <$> sortBy (compare `on` fst) modifiedDates
+      
     timeSortFiles dirContents =
       sortModifiedDateTuples <$>
       traverse buildModifiedDateTuple (filter isSTPrefixedFile dirContents)
+      
     buildModifiedDateTuple :: FilePath -> IO (UTCTime, FilePath) -- time last modified and file being referred to
     buildModifiedDateTuple file = (, file) <$> getModified file
+    
+    -- If something goes wrong with another method of searching for the latest file
+    -- use the modified date on the OS
     defaultToNewest :: [FilePath] -> IO FilePath
-    defaultToNewest filesSortedByTouchTime = do
-      if Prelude.null filesSortedByTouchTime
-        then fail "no state file found"
-        else pure $ Prelude.last filesSortedByTouchTime
+    defaultToNewest filesSortedByTouchTime
+      | Prelude.null filesSortedByTouchTime = fail "no state file found"
+      | otherwise                           = pure $ Prelude.last filesSortedByTouchTime
+      
     openStoreFound dir = do
-      dirContents <- listDirectory dir
+      dirContents            <- listDirectory dir
       filesSortedByTouchTime <- timeSortFiles dirContents
-      lastTouchExists <- (isFile . lastTouch) dir
+      lastTouchExists        <- (isFile . lastTouch) dir
       if lastTouchExists
         then do
           fpExpected <-

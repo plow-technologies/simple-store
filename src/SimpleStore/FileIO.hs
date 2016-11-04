@@ -61,11 +61,13 @@ openNewestStore f (x:xs) = do
   where
     hIOException
       :: (FilePath -> IO (Either StoreError b)) -- createNewStore
-      -> [FilePath] -- list of files to try
-      -> IOException -- io exceptions
+      -> [FilePath]                             -- list of files to try
+      -> IOException                            -- io exceptions
       -> IO (Either StoreError b)
     hIOException func ys e =
       hPrint stderr e >> openNewestStore func (Prelude.filter (not . (== x)) ys)
+    
+
 
 -- Attempt to open a store from a filepath
 createStoreFromFilePath

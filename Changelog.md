@@ -3,6 +3,8 @@
 # Last Updated 11-04-2016	
 
 Simple-Store
++ 3.0.0
+  removed close store  
 + 2.1.0
   removed Handle holding
 + 2.0.4
