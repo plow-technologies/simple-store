@@ -62,7 +62,6 @@ openSimpleStore fp = do
   dir <- makeAbsoluteFp fp
   exists <- isDirectory dir
   if exists
-<<<<<<< HEAD
     then openStoreFound dir
     else return . Left $ StoreFolderNotFound
   where
@@ -100,57 +99,6 @@ openSimpleStore fp = do
         else openNewestStore
                createStoreFromFilePath
                (Prelude.reverse filesSortedByTouchTime)
-=======
-     then  openStoreFound dir
-     else return . Left $ StoreFolderNotFound
-  where     
-     isSTPrefixedFile    = isState
-     lastTouch      dir  = dir </> "last.touch"
-     sortModifiedDateTuples modifiedDates = snd <$> sortBy (compare `on` fst) modifiedDates
-     timeSortFiles dirContents          = sortModifiedDateTuples <$>
-                                          traverse buildModifiedDateTuple (filter isSTPrefixedFile dirContents)
-     buildModifiedDateTuple :: FilePath -> IO (UTCTime, FilePath)  -- time last modified and file being referred to 
-     buildModifiedDateTuple file = (,file) <$> getModified file
-     
-     defaultToNewest :: [FilePath] -> IO FilePath
-     defaultToNewest filesSortedByTouchTime = do
-       if Prelude.null filesSortedByTouchTime
-       then fail "no state file found"
-       else pure $ Prelude.last filesSortedByTouchTime
-
-     openStoreFound dir  = do       dirContents              <- listDirectory        dir
-                                    filesSortedByTouchTime   <- timeSortFiles dirContents    
-                                    lastTouchExists          <- (isFile . lastTouch) dir                                         
-                                    if lastTouchExists 
-                                    then  do
-                                     fpExpected <- do                                                   
-                                              let stringFilePath = encodeString (lastTouch dir) :: String
-                                              binaryContent <- try $ B.readFile stringFilePath :: IO (Either SomeException B.ByteString)
-                                              -- Decode bytestring as text
-                                              case decodeUtf8' <$> binaryContent of                                                     
-                                               Left err -> do
-                                               -- There was an error reading the file
-                                                 putStrLn $ "Error reading file " ++ stringFilePath ++ ": " ++ show err
-                                                 defaultToNewest filesSortedByTouchTime
-                                               Right etext ->
-                                                 -- Bytes were loaded successfully 
-                                                 case etext of
-                                                   Left err -> do
-                                                     -- There was an error decoding the bytes as text
-                                                     putStrLn $ "Error parsing text of file " ++ stringFilePath ++ ": " ++ show err
-                                                     defaultToNewest filesSortedByTouchTime
-                                                   -- File was parsed as text successfully
-                                                   Right text -> pure $ fromText text
-                                     putStrLn $ "file path: " ++ (show fpExpected)
-                                     openNewestStore createStoreFromFilePath ((fpExpected) : Prelude.reverse filesSortedByTouchTime)
-                                    else
-                                      openNewestStore createStoreFromFilePath ( Prelude.reverse filesSortedByTouchTime)
-                                   
-
-
-
-
->>>>>>> master
 
 -- | Initialize a simple store from a given filepath and state.
 -- The filepath should just be to the directory you want the state created in
