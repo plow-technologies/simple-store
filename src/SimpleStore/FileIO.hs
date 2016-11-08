@@ -118,6 +118,7 @@ withFsyncCheck Fsync handle' = do
   where
     concatShow x y = (show x) ++ (show y)
 
+
 -- | Create a checkpoint for a store. This attempts to write the state to disk
 -- If successful it updates the version, releases the old file handle, and deletes the old file
 checkpoint
