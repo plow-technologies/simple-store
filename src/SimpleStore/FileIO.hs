@@ -28,7 +28,7 @@ import Filesystem
         getWorkingDirectory)
 
 import Filesystem.Path.CurrentOS
-       (FilePath, filename, (</>), directory, fromText, encodeString,
+       (FilePath, filename,dirname, (</>), directory, fromText, encodeString,
         absolute)
 
 import Prelude
@@ -58,7 +58,7 @@ openNewestStore f (x:xs) = do
   case res of
     Left e ->
       putStrLn "errors found and written to errors.log" >>
-      (appendFile ("errors" ++ (show . filename) x ++ ".log") ("filePath:" ++ show x ++ "\n error: " ++ show e)) >>
+      (appendFile ("errors-in-" ++ (encodeString . dirname) x ++ ".log") ("filePath:" ++ show x ++ "\n error: " ++ show e)) >>
       openNewestStore f (Prelude.filter (not . (== x)) xs)
     _ -> return res
   where
