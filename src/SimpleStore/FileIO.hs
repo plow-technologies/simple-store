@@ -200,7 +200,7 @@ readLastTouch dir failoverAction = performRead >>=
     evaluateResult (Left  err) = recordError err *> failoverAction
     evaluateResult (Right txt) = return . fromText $ txt
     
-    recordError     e = appendFile "errors.log" ("filePath:" ++ show  lastTouch  ++ "\n error: " ++ show e)    
+    recordError     e = appendFile ("errors-in-"++ (encodeString . dirname) lastTouch  ++ ".log") ("filePath:" ++ show  lastTouch  ++ "\n error: " ++ show e)    
     readFileError   e =  "error reading file "         ++ show e
     decodeFileError e =  "error parsing text of file " ++ show e
     

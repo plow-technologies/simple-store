@@ -1,0 +1,84 @@
+name: simple-store
+version: '3.0.0'
+synopsis: An atomic, durable data store
+description: An atomic, durable data store
+author: Kevin Cotrone <kevincotrone@gmail.com>
+maintainer: Kevin Cotrone <kevincotrone@gmail.com>
+license: BSD3
+git: git@github.com:plow-technologies/simple-store.git
+extra-source-files:
+- README.md
+- Changelog.md
+dependencies:
+- async
+- base >=4 && <5
+- stm >=2.4.3
+- system-fileio >=0.3.15
+- system-filepath >=0.4.12
+- cereal >=0.4.1.0
+- bytestring >=0.10.4.0
+- unix >=2.7.0.1
+- text >=1.1 && <1.3
+- safe >=0.3.8
+- bifunctors >=4.2
+- time >=1.4.2
+library:
+  source-dirs: src
+  ghc-options: -Wall
+  exposed-modules:
+  - SimpleStore
+  dependencies:  
+
+executables:
+  build-the-docs:
+    main: Main.hs
+    source-dirs:  docs-src
+    ghc-options: -Wall
+    dependencies:
+      - shake
+      - haddock-api
+      - text
+      - time
+      - yaml
+      - aeson
+      - lens
+tests:
+  mem-spec:
+    main: MemSpec.hs
+    source-dirs:
+    - src
+    - mem-test
+    - test
+    ghc-options:
+    - -threaded
+    - -Wall
+    - -rtsopts
+    dependencies:
+    - hspec
+  spec:
+    main: Spec.hs
+    source-dirs:
+    - src
+    - test
+    ghc-options: -Wall
+    dependencies:
+    - hspec
+benchmarks:
+  simple-store-bench:
+    main: Main.hs
+    source-dirs:
+    - bench
+    - src
+    ghc-options:
+    - -threaded
+    - -Wall
+    - -rtsopts
+    - -prof
+    - -auto-all
+    dependencies:
+    - hspec
+flags:
+  rebench:
+    description: Setup second run for profiling
+    manual: false
+    default: false

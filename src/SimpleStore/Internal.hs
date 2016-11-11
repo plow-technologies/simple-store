@@ -1,6 +1,16 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+
+{- |
+Module      : SimpleStore.Internal
+Description : Internal Parts of Simple Store
+Copyright   : Plow Technologies LLC
+Maintainer  : Scott Murphy
+
+top level description
+
+| -}
 module SimpleStore.Internal (
     putWriteStore
   , obtainLock
@@ -30,7 +40,7 @@ import           System.Posix.Process
 import           System.Posix.Types
 
 
-
+-- | Insert a new state into a given 'SimpleStore'
 putWriteStore :: SimpleStore st -> st -> IO ()
 putWriteStore store state = atomically $ writeTVar tState state
   where tState = storeState store
@@ -57,12 +67,12 @@ processExists s = catch (getProcessPriority (CPid . fromIntegral $ s) >> return 
     handleNotFound :: IOException -> IO Bool
     handleNotFound _ = return False
 
--- Get the version number of a file from the filepath
+-- | Get the version number of a file from the filepath
 getVersionNumber :: FilePath -> Either String Int
 getVersionNumber fp = second fst $ join $ decimal <$> eTextFp
   where eTextFp = first unpack $ toText fp
 
--- Create a store from it's members. Just creates the necessary TMVars/TVars
+-- | Create a store from it's members. Just creates the necessary TMVars/TVars
 createStore :: FilePath -> Int -> st -> IO (SimpleStore st)
 createStore fp version st = do
   sState   <- newTVarIO  st
@@ -74,7 +84,7 @@ createStore fp version st = do
                        , storeLock              = sLock
                        , storeCheckpointVersion = sVersion}
 
--- Checks the extension of a filepath for ".st"
+-- | Checks the extension of a filepath for ".st"
 isState :: FilePath -> Bool
 isState fp = extension fp == Just "st"
 

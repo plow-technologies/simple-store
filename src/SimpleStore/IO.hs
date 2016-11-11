@@ -2,6 +2,17 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+
+{- |
+Module      : SimpleStore.IO
+Description : IO Interface functions for simple-store
+Copyright   : Plow Technologies LLC
+
+Maintainer  : Scott Murphy
+
+
+
+| -}
 module SimpleStore.IO
   ( putSimpleStore
   , getSimpleStore

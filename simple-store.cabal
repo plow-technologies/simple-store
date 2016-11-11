@@ -1,120 +1,174 @@
-Name:                   simple-store
-Version:                3.0.0
-Author:                 Kevin Cotrone <kevincotrone@gmail.com>
-Maintainer:             Kevin Cotrone <kevincotrone@gmail.com>
-License:                BSD3
-License-File:           LICENSE
-Synopsis:               An atomic, durable, and transactional data store 
-Description:            An atomic, durable, and transactional data store 
-Cabal-Version:          >= 1.10
-Build-Type:             Simple
-Flag                    rebench 
-  Description:          Setup second run for profiling
-  Default:              False
+-- This file has been generated from package.yaml by hpack version 0.14.1.
+--
+-- see: https://github.com/sol/hpack
 
-Library
-  Default-Language:     Haskell2010
-  HS-Source-Dirs:       src
-  GHC-Options:          -Wall
-  Exposed-Modules:      SimpleStore
-  Other-Modules:        SimpleStore.Internal
-                      , SimpleStore.Types
-                      , SimpleStore.IO
-                      , SimpleStore.FileIO
-  Build-Depends:        base >= 4 && < 5
-                      , stm >= 2.4.3
-                      , system-fileio >= 0.3.15
-                      , system-filepath >= 0.4.12
-                      , cereal >= 0.4.1.0
-                      , bytestring >= 0.10.4.0
-                      , unix >= 2.7.0.1
-                      , text >= 1.1 && < 1.3
-                      , safe >= 0.3.8
-                      , bifunctors >= 4.2
-                      , time >= 1.4.2
-                      , async
+name:                   simple-store
+version:                3.0.0
+synopsis:               An atomic, durable data store
+description:            An atomic, durable data store
+author:                 Kevin Cotrone <kevincotrone@gmail.com>
+maintainer:             Kevin Cotrone <kevincotrone@gmail.com>
+license:                BSD3
+license-file:           LICENSE
+build-type:             Simple
+cabal-version:          >= 1.10
 
-Test-Suite spec
-  Type:                 exitcode-stdio-1.0
-  Default-Language:     Haskell2010
-  Hs-Source-Dirs:       src
-                      , test
-  Ghc-Options:          -Wall
-  Main-Is:              Spec.hs
-  Build-Depends:        base
-                      , hspec
-                      , stm
-                      , system-fileio
-                      , system-filepath
-                      , cereal
-                      , bytestring
-                      , unix
-                      , text
-                      , safe
-                      , bifunctors
-                      , time
-                      , async
+extra-source-files:
+    Changelog.md
+    README.md
 
-Test-Suite mem-spec 
-  Type:                 exitcode-stdio-1.0
-  Default-Language:     Haskell2010
-  Hs-Source-Dirs:       src
-                      , mem-test
-                      , test
-  Ghc-Options:          -threaded -Wall  -rtsopts 
-  Main-Is:              MemSpec.hs
-  Build-Depends:        base
-                      , hspec
-                      , stm
-                      , system-fileio
-                      , system-filepath
-                      , cereal
-                      , bytestring
-                      , unix
-                      , text
-                      , safe
-                      , bifunctors
-                      , time
-                      , async
+source-repository head
+  type: git
+  location: git@github.com:plow-technologies/simple-store.git
 
+flag rebench
+  description: Setup second run for profiling
+  manual: False
+  default: False
+
+library
+  hs-source-dirs:
+      src
+  ghc-options: -Wall
+  build-depends:
+      async
+    , base >=4 && <5
+    , stm >=2.4.3
+    , system-fileio >=0.3.15
+    , system-filepath >=0.4.12
+    , cereal >=0.4.1.0
+    , bytestring >=0.10.4.0
+    , unix >=2.7.0.1
+    , text >=1.1 && <1.3
+    , safe >=0.3.8
+    , bifunctors >=4.2
+    , time >=1.4.2
+  exposed-modules:
+      SimpleStore
+  other-modules:
+      SimpleStore.FileIO
+      SimpleStore.Internal
+      SimpleStore.IO
+      SimpleStore.Types
+      Paths_simple_store
+  default-language: Haskell2010
+
+executable build-the-docs
+  main-is: Main.hs
+  hs-source-dirs:
+      docs-src
+  ghc-options: -Wall
+  build-depends:
+      async
+    , base >=4 && <5
+    , stm >=2.4.3
+    , system-fileio >=0.3.15
+    , system-filepath >=0.4.12
+    , cereal >=0.4.1.0
+    , bytestring >=0.10.4.0
+    , unix >=2.7.0.1
+    , text >=1.1 && <1.3
+    , safe >=0.3.8
+    , bifunctors >=4.2
+    , time >=1.4.2
+    , shake
+    , haddock-api
+    , text
+    , time
+    , yaml
+    , aeson
+    , lens
+  default-language: Haskell2010
+
+test-suite mem-spec
+  type: exitcode-stdio-1.0
+  main-is: MemSpec.hs
+  hs-source-dirs:
+      src
+    , mem-test
+    , test
+  ghc-options: -threaded -Wall -rtsopts
+  build-depends:
+      async
+    , base >=4 && <5
+    , stm >=2.4.3
+    , system-fileio >=0.3.15
+    , system-filepath >=0.4.12
+    , cereal >=0.4.1.0
+    , bytestring >=0.10.4.0
+    , unix >=2.7.0.1
+    , text >=1.1 && <1.3
+    , safe >=0.3.8
+    , bifunctors >=4.2
+    , time >=1.4.2
+    , hspec
+  other-modules:
+      SimpleStore
+      SimpleStore.FileIO
+      SimpleStore.Internal
+      SimpleStore.IO
+      SimpleStore.Types
+      SimpleStore.CellSpec
+      SimpleStoreSpec
+      Spec
+  default-language: Haskell2010
+
+test-suite spec
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  hs-source-dirs:
+      src
+    , test
+  ghc-options: -Wall
+  build-depends:
+      async
+    , base >=4 && <5
+    , stm >=2.4.3
+    , system-fileio >=0.3.15
+    , system-filepath >=0.4.12
+    , cereal >=0.4.1.0
+    , bytestring >=0.10.4.0
+    , unix >=2.7.0.1
+    , text >=1.1 && <1.3
+    , safe >=0.3.8
+    , bifunctors >=4.2
+    , time >=1.4.2
+    , hspec
+  other-modules:
+      SimpleStore
+      SimpleStore.FileIO
+      SimpleStore.Internal
+      SimpleStore.IO
+      SimpleStore.Types
+      SimpleStore.CellSpec
+      SimpleStoreSpec
+  default-language: Haskell2010
 
 benchmark simple-store-bench
-  type:                   exitcode-stdio-1.0
-  Hs-Source-Dirs:         bench
-                         ,src
-  Default-Language:     Haskell2010
-  main-is:                Main.hs
-  build-depends:          base
-                      , hspec
-                      , stm
-                      , system-fileio
-                      , system-filepath
-                      , cereal
-                      , bytestring
-                      , unix
-                      , text
-                      , safe
-                      , bifunctors
-                      , time
-                      , async
-                      , simple-store
-                      , random
-                      , stm
-                      , system-fileio
-                      , system-filepath
-                      , cereal
-                      , bytestring
-                      , unix
-                      , text
-                      , safe
-                      , bifunctors
-                      , time
-                      , async
-
-                        
-  Ghc-Options:          -threaded -Wall  -rtsopts -prof -auto-all 
- 
-Source-Repository head 
-  Type:                 git
-  Location:             git@github.com:plow-technologies/simple-store.git
-            
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  hs-source-dirs:
+      bench
+    , src
+  ghc-options: -threaded -Wall -rtsopts -prof -auto-all
+  build-depends:
+      async
+    , base >=4 && <5
+    , stm >=2.4.3
+    , system-fileio >=0.3.15
+    , system-filepath >=0.4.12
+    , cereal >=0.4.1.0
+    , bytestring >=0.10.4.0
+    , unix >=2.7.0.1
+    , text >=1.1 && <1.3
+    , safe >=0.3.8
+    , bifunctors >=4.2
+    , time >=1.4.2
+    , hspec
+  other-modules:
+      SimpleStore
+      SimpleStore.FileIO
+      SimpleStore.Internal
+      SimpleStore.IO
+      SimpleStore.Types
+  default-language: Haskell2010
