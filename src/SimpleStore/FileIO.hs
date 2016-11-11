@@ -30,6 +30,7 @@ import Filesystem
 import Filesystem.Path.CurrentOS
        (FilePath, filename, (</>), directory, fromText, encodeString,
         absolute)
+
 import Prelude
        (Either(..), (.), ($), (++), show, Bool(..), print, mod, (/=),
         (*>), String, IO, otherwise, putStrLn, appendFile, filter, not,
@@ -57,7 +58,7 @@ openNewestStore f (x:xs) = do
   case res of
     Left e ->
       putStrLn "errors found and written to errors.log" >>
-      (appendFile "errors.log" ("filePath:" ++ show x ++ "\n error: " ++ show e)) >>
+      (appendFile ("errors" ++ (show . filename) x ++ ".log") ("filePath:" ++ show x ++ "\n error: " ++ show e)) >>
       openNewestStore f (Prelude.filter (not . (== x)) xs)
     _ -> return res
   where
