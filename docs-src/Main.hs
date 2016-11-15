@@ -149,7 +149,6 @@ haddockInStackWork :: NamesThatMustBeDiscovered -> FilePath
 haddockInStackWork names = ".stack-work" </> "dist" </>"x86_64-linux"</>cabalPath</>"doc"</> "html" </> packageName
   where
     (NamesThatMustBeDiscovered { cabalPath
-                               , ltsPath
                                , packageName}) = names
 
 -- index.html for package docs
@@ -157,11 +156,9 @@ haddockInStackWorkIndex :: NamesThatMustBeDiscovered -> FilePath
 haddockInStackWorkIndex names = haddockInStackWork names </> "index.html"
 
 haddockOtherPackagesInStackWork :: NamesThatMustBeDiscovered -> FilePath
-haddockOtherPackagesInStackWork names = ".stack-work"</>"install"</>"x86_64-linux"</>"lts-6.13"</>"7.10.3"</>"doc"
+haddockOtherPackagesInStackWork names = ".stack-work"</>"install"</>"x86_64-linux"</>ltsPath</>"7.10.3"</>"doc"
   where
-    (NamesThatMustBeDiscovered { cabalPath
-                               , ltsPath
-                               , packageName}) = names
+    (NamesThatMustBeDiscovered {ltsPath}) = names
 
 haddockInDocs :: FilePath
 haddockInDocs = "docs" 
@@ -196,15 +193,17 @@ getTarget = do
 
 buildNamesThatMustBeDiscovered = do
                                 target       <- getTarget
-                                eitherDirs   <- getDirectories target
+                                dirs   <- getDirectories target
                                 mPkgName      <- getPackageInfo
-                                let eitherTextDirs   = fmap unpack . CurrentOS.toText . CurrentOS.basename <$> eitherDirs 
-                                    maybeLtsString   = eitherTextDirs ^? folded . _Right . regex [r|lts.*|] . matchedString
-                                    maybeCabalString = eitherTextDirs ^? folded . _Right . regex [r|Cabal.*|] . matchedString
-                                                                                                 
-                                return $ NamesThatMustBeDiscovered <$> maybeLtsString  <*> maybeCabalString <*> mPkgName
 
-ex = "test" ^? regex [r|te|] . matchedString :: Maybe String
+                                let eitherTextDirs   = CurrentOS.encodeString  <$> dirs
+                                    maybeLtsString   = eitherTextDirs ^? folded .  regex [r|lts.*|] . matchedString
+                                    maybeCabalString = eitherTextDirs ^? folded .  regex [r|Cabal.*|] . matchedString
+                                print eitherTextDirs
+
+                                return $ NamesThatMustBeDiscovered <$>  maybeCabalString <*> maybeLtsString <*> mPkgName
+
+ex = "test-1.2.3" ^? regex [r|te.*|] . matchedString :: Maybe String
 
 
 
