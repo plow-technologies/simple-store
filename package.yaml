@@ -40,8 +40,11 @@ executables:
       - text
       - time
       - yaml
+      - lens-aeson
       - aeson
       - lens
+      - lens-regex
+      - regex-posix
 tests:
   mem-spec:
     main: MemSpec.hs

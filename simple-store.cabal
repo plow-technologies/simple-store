@@ -76,8 +76,11 @@ executable build-the-docs
     , text
     , time
     , yaml
+    , lens-aeson
     , aeson
     , lens
+    , lens-regex
+    , regex-posix
   default-language: Haskell2010
 
 test-suite mem-spec
