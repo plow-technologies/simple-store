@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 module Main where
@@ -81,29 +82,29 @@ buildTheDocsRules = do
 -- | build elements that depend on specific configurations of stack.yaml
 --  this mostly involves setting up the correct cabal and lts directories
 --  for copying over the documentation. 
-runDynamics = do  
-  return $ GeneratedStaticRules [haddockInDocsIndex, haddockInStackWorkIndex] [ stackHaddockRule
-                                                                              , docsHaddockRule ]
+runDynamics = do
+  (Just names) <- liftIO buildNamesThatMustBeDiscovered
+  return $ GeneratedStaticRules [haddockInDocsIndex     , haddockInStackWorkIndex names]
+                                [stackHaddockRule names , docsHaddockRule names]
 
 
 
 
 -- | Build the documentation in the .stack-work folder  
 
-stackHaddockRule :: Rules ()
-stackHaddockRule = haddockInStackWorkIndex %> \out -> do
+stackHaddockRule :: NamesThatMustBeDiscovered -> Rules ()
+stackHaddockRule names = haddockInStackWorkIndex names %> \out -> do
   liftIO $ putStrLn "Poop"
   liftIO $ print out
   stackHaddockCommand
 
 
 -- | Copy the documentation into the destination folder 
-docsHaddockRule :: Rules ()
-docsHaddockRule = haddockInDocsIndex %> \_ -> do
-    need [haddockInStackWorkIndex]
-    
-    copyOtherPackagesCommand -- This needs to come before copyHaddock
-    copyHaddockCommand
+-- docsHaddockRule :: Rules ()
+docsHaddockRule names = haddockInDocsIndex %> \_ -> do
+    need [haddockInStackWorkIndex names]    
+    copyOtherPackagesCommand names -- This needs to come before copyHaddock
+    copyHaddockCommand names
 
 
 
@@ -127,11 +128,11 @@ stackHaddockCommand = command_ [] cmdString opts
     opts      = ["haddock"]
     
 
-copyHaddockCommand :: Action ()
-copyHaddockCommand = command_ [] "rsync" ["-arv",haddockInStackWork </>"." , haddockInDocs  ]
+copyHaddockCommand :: NamesThatMustBeDiscovered -> Action ()
+copyHaddockCommand names = command_ [] "rsync" ["-arv",haddockInStackWork names  </>"." , haddockInDocs  ]
 
-copyOtherPackagesCommand :: Action ()
-copyOtherPackagesCommand = command_ [] "rsync" ["-arv", haddockOtherPackagesInStackWork </> ".", haddockInDocs]
+copyOtherPackagesCommand :: NamesThatMustBeDiscovered -> Action ()
+copyOtherPackagesCommand names = command_ [] "rsync" ["-arv", haddockOtherPackagesInStackWork names </> ".", haddockInDocs]
 
 
 
@@ -144,15 +145,23 @@ copyOtherPackagesCommand = command_ [] "rsync" ["-arv", haddockOtherPackagesInSt
 -------------------------------------------------
 
 -- Hidden directory for generated documents
-haddockInStackWork :: FilePath
-haddockInStackWork = ".stack-work" </> "dist" </>"x86_64-linux"</>"Cabal-1.22.5.0"</>"doc"</> "html" </> "simple-store"
+haddockInStackWork :: NamesThatMustBeDiscovered -> FilePath
+haddockInStackWork names = ".stack-work" </> "dist" </>"x86_64-linux"</>cabalPath</>"doc"</> "html" </> packageName
+  where
+    (NamesThatMustBeDiscovered { cabalPath
+                               , ltsPath
+                               , packageName}) = names
 
 -- index.html for package docs
-haddockInStackWorkIndex :: FilePath
-haddockInStackWorkIndex = haddockInStackWork </> "index.html"
+haddockInStackWorkIndex :: NamesThatMustBeDiscovered -> FilePath
+haddockInStackWorkIndex names = haddockInStackWork names </> "index.html"
 
-haddockOtherPackagesInStackWork :: FilePath
-haddockOtherPackagesInStackWork = ".stack-work"</>"install"</>"x86_64-linux"</>"lts-6.13"</>"7.10.3"</>"doc"
+haddockOtherPackagesInStackWork :: NamesThatMustBeDiscovered -> FilePath
+haddockOtherPackagesInStackWork names = ".stack-work"</>"install"</>"x86_64-linux"</>"lts-6.13"</>"7.10.3"</>"doc"
+  where
+    (NamesThatMustBeDiscovered { cabalPath
+                               , ltsPath
+                               , packageName}) = names
 
 haddockInDocs :: FilePath
 haddockInDocs = "docs" 
