@@ -10,6 +10,7 @@ module SimpleStore.IO
   , createCheckpointImmediate
   , closeSimpleStore
   , modifySimpleStore
+  , modifySimpleStoreResult
   , makeSimpleStore
   , attemptOpenDefault
   ) where
@@ -17,7 +18,7 @@ module SimpleStore.IO
 import Control.Concurrent.STM.TVar (readTVarIO
                                    ,readTVar
                                    ,writeTVar)
-       
+
 import Control.Monad hiding (sequence)
 import Control.Monad.STM (atomically)
 
@@ -30,7 +31,7 @@ import Data.Text hiding (filter, foldl, map, maximum, stripPrefix)
 
 
 import Filesystem
-       (isDirectory, getModified, listDirectory, isFile, writeFile) 
+       (isDirectory, getModified, listDirectory, isFile, writeFile)
 import Filesystem.Path.CurrentOS
        (FilePath, (</>),  fromText)
 import Prelude
@@ -67,24 +68,24 @@ openSimpleStore fp = do
   where
     isSTPrefixedFile = isState
     lastTouch dir    = dir </> "last.touch"
-    
+
     sortModifiedDateTuples modifiedDates =
       snd <$> sortBy (compare `on` fst) modifiedDates
-      
+
     timeSortFiles dirContents =
       sortModifiedDateTuples <$>
       traverse buildModifiedDateTuple (filter isSTPrefixedFile dirContents)
-      
+
     buildModifiedDateTuple :: FilePath -> IO (UTCTime, FilePath) -- time last modified and file being referred to
     buildModifiedDateTuple file = (, file) <$> getModified file
-    
+
     -- If something goes wrong with another method of searching for the latest file
     -- use the modified date on the OS
     defaultToNewest :: [FilePath] -> IO FilePath
     defaultToNewest filesSortedByTouchTime
       | Prelude.null filesSortedByTouchTime = fail "no state file found"
       | otherwise                           = pure $ Prelude.last filesSortedByTouchTime
-      
+
     openStoreFound dir = do
       dirContents            <- listDirectory dir
       filesSortedByTouchTime <- timeSortFiles dirContents
@@ -149,6 +150,18 @@ modifySimpleStore store modifyFunc =
     Right <$> (atomically $ writeTVar tState res)
   where
     tState = storeState store
+
+modifySimpleStoreResult :: SimpleStore st
+                        -> (st -> IO st)
+                        -> IO (Either StoreError st)
+modifySimpleStoreResult store modifyFunc =
+  withLock store $ do
+    res <- modifyFunc =<< readTVarIO tState
+    atomically $ writeTVar tState res
+    return $ Right res
+  where
+    tState = storeState store
+
 
 -- | Write the current store to disk in the given folder
 createCheckpoint
