@@ -53,7 +53,7 @@ deployment:
            echo $status && echo export status=$status >> ~/.bashrc && source ~/.bashrc
       # Setup Tag Release
       - git clone git@github.com:Daniel-Diaz/tagthis.git
-      - cd tagthis && stack build
+      - cd tagthis && stack setup && stack build
       - git config --global user.email "ar@plowtech.net"
       - git config --global user.name "plowtech-bot"
       # If Hackage Upload Successful Tag Release and Upload documentation to plow hackage  
