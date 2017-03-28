@@ -32,7 +32,7 @@ Library
                       , safe >= 0.3.8
                       , bifunctors >= 4.2
                       , time >= 1.4.2
-                      , atomic-write
+                      , atomic-write >= 0.2.0.5
 
 Test-Suite spec
   Type:                 exitcode-stdio-1.0
@@ -54,6 +54,7 @@ Test-Suite spec
                       , bifunctors
                       , time
                       , async
+                      , atomic-write
 
 Test-Suite mem-spec
   Type:                 exitcode-stdio-1.0
@@ -76,6 +77,7 @@ Test-Suite mem-spec
                       , bifunctors
                       , time
                       , async
+                      , atomic-write
 
 
 benchmark simple-store-bench
@@ -110,6 +112,7 @@ benchmark simple-store-bench
                       , bifunctors
                       , time
                       , async
+                      , atomic-write
 
 
   Ghc-Options:          -threaded -Wall  -rtsopts -prof -auto-all
