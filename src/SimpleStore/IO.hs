@@ -44,6 +44,10 @@ import SimpleStore.FileIO
 import SimpleStore.Internal
 import SimpleStore.Types
 
+import System.AtomicWrite.Writer.ByteString
+
+import Filesystem.Path.CurrentOS (encodeString)
+
 -- | Get the current value of the store
 getSimpleStore :: SimpleStore st -> IO st
 getSimpleStore store = atomically . readTVar . storeState $ store
@@ -121,8 +125,8 @@ makeSimpleStore dir state = do
          (unpack checkpointBaseFileName) -- we write a backup immediately
          )
       initialVersion = 0
-  writeFile checkpointPath encodedState
-  writeFile checkpointPathBackup encodedState
+  atomicWriteFile (encodeString checkpointPath) encodedState
+  atomicWriteFile (encodeString checkpointPathBackup) encodedState
   Right <$> createStore fp (1 + initialVersion) state
 
 -- | Attempt to open a store. If the store doesn't it exist it will create the store in the filepath given
