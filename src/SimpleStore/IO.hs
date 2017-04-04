@@ -44,6 +44,8 @@ import SimpleStore.FileIO
 import SimpleStore.Internal
 import SimpleStore.Types
 
+import Data.Function (const)
+
 -- | Get the current value of the store
 getSimpleStore :: SimpleStore st -> IO st
 getSimpleStore store = atomically . readTVar . storeState $ store
@@ -145,19 +147,26 @@ modifySimpleStore :: SimpleStore st
                   -> (st -> IO st)
                   -> IO (Either StoreError ())
 modifySimpleStore store modifyFunc =
-  withLock store $ do
-    res <- modifyFunc =<< readTVarIO tState
-    Right <$> (atomically $ writeTVar tState res)
-  where
-    tState = storeState store
+  (fmap (const ())) <$> modifySimpleStoreResult store modifyFunc
 
+-- | Modify a simple store with a function that
+-- computes a new state
 modifySimpleStoreResult :: SimpleStore st
                         -> (st -> IO st)
                         -> IO (Either StoreError st)
 modifySimpleStoreResult store modifyFunc =
+  (fmap fst) <$> modifySimpleStoreResultWith store (fmap (\x -> (x,())) . modifyFunc)
+
+
+-- | Modify a simple store internal value and
+-- and return a value computed inside the modify function
+modifySimpleStoreResultWith :: SimpleStore st
+                            -> (st -> IO (st, a))
+                            -> IO (Either StoreError (st, a))
+modifySimpleStoreResultWith store modifyFunc =
   withLock store $ do
-    res <- modifyFunc =<< readTVarIO tState
-    atomically $ writeTVar tState res
+    res@(st', _) <- modifyFunc =<< readTVarIO tState
+    atomically $ writeTVar tState st'
     return $ Right res
   where
     tState = storeState store
