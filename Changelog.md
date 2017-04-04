@@ -3,6 +3,8 @@
 # Last Updated 11-04-2016	
 
 Simple-Store
++ 3.1.0
+  use atomic-write to handle file writing
 + 3.0.1
   add modifySimpleStoreResultWith
 + 3.0.0

@@ -18,6 +18,7 @@ import Control.Exception (catch, IOException, try, SomeException)
 import Control.Monad (return, (>>), fail, (>>=))
 import Data.Bifunctor (first)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BSC8
 import Data.Text.Encoding (decodeUtf8')
 import Data.Serialize (Serialize, decode, encode)
 import Data.Text (append, Text, pack)
@@ -44,6 +45,9 @@ import System.IO.Error
 import System.Posix.IO (handleToFd, closeFd)
 
 import System.Posix.Unistd (fileSynchronise)
+
+import System.AtomicWrite.Writer.ByteString
+
 
 -- --------------------------------------------------
 -- API
@@ -79,7 +83,7 @@ createStoreFromFilePath
 createStoreFromFilePath fp = do
   let eVersion = getVersionNumber . filename $ fp
   eFHandle <-
-    try (openFile fp ReadWriteMode) :: IO (Either SomeException Handle)
+    try (openFile fp ReadMode) :: IO (Either SomeException Handle)
   eFConts <- (either (return . Left) (try . BS.hGetContents) eFHandle)
   eitherStore <-
     sequence $
@@ -138,20 +142,20 @@ checkpoint fsync store = do
       newCheckpointPath
         | oldFileName /= newFileName = fp </> fromText newFileName
         | otherwise = error "old filename and new file name must never match"
-  !newHandle <- openFile newCheckpointPath WriteMode -- new checkpoint creation
+  -- !newHandle <- openFile newCheckpointPath WriteMode -- new checkpoint creation
   !eFileRes <-
     catch
-      (Right <$> BS.hPut newHandle encodedState)
+      (Right <$> atomicWriteFile (encodeString newCheckpointPath) encodedState)
       (return . Left . catchStoreError)
   eVal <- updateIfWritten eFileRes newVersion
   _ <- writeNewLastTouchValue fp newCheckpointPath -- want to write after we know everything worked
-  withFsyncCheck fsync newHandle
+  -- withFsyncCheck fsync newHandle
   return eVal
   where
     writeNewLastTouchValue fp newCheckpointPath =
-      Text.writeFile
+      atomicWriteFile
         (encodeString $ fp </> "last.touch")
-        (pack . encodeString $ newCheckpointPath)
+        (BSC8.pack . encodeString $ newCheckpointPath)
     tVersion = storeCheckpointVersion store
     updateIfWritten l@(Left s) _ =
       putStrLn "updateIfWritten error: " *> print s *> pure l
