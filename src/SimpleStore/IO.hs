@@ -11,6 +11,7 @@ module SimpleStore.IO
   , closeSimpleStore
   , modifySimpleStore
   , modifySimpleStoreResult
+  , modifySimpleStoreResultWith
   , makeSimpleStore
   , attemptOpenDefault
   ) where
