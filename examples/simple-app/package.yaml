@@ -1,0 +1,26 @@
+name: simple-app
+version: '0.1.0.0'
+synopsis: A simple application using simple cell
+description: README.md
+category: Web
+author: James M.C. Haver II
+maintainer: james.haver@plowtech.net
+copyright: 2017 Plow Technologies
+license: BSD3
+github: plow-technologies/simple-cell
+
+executables:
+  simple-app:
+    main: Main.hs
+    source-dirs: app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - aeson
+    - base >=4.7 && <5
+    - cereal
+    - hashable
+    - simple-store
+    - text
