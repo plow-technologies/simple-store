@@ -12,3 +12,4 @@ cabal.sandbox.config
 /test-states/1checkpoint.st
 /test-states
 .stack-work
+/examples/simple-app/DjangoAddress
