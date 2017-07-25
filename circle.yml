@@ -52,13 +52,13 @@ deployment:
            status=$(curl --output /dev/stderr --write-out "%{http_code}" -i -F package=@$tarball https://hackage.plowtech.net/packages/upload -u $hackage_username:$hackage_password) &&
            echo $status && echo export status=$status >> ~/.bashrc && source ~/.bashrc
       # Setup Tag Release
-      - git clone git@github.com:Daniel-Diaz/tagthis.git
-      - cd tagthis && stack setup && stack build
+      - aws s3 cp --quiet s3://plow-build-tools/tagthis ~/.local/bin/tagthis
+      - chmod +x ~/.local/bin/tagthis
       - git config --global user.email "ar@plowtech.net"
       - git config --global user.name "plowtech-bot"
       # If Hackage Upload Successful Tag Release and Upload documentation to plow hackage  
       - mkdir scripts
-      - if [[ "$status" == 200 ]]; then tagthis/.stack-work/dist/x86_64-linux/Cabal*/build/tagthis/tagthis; fi    
+      - if [[ "$status" == 200 ]]; then tagthis; fi
       - if [[ "$status" == 200 ]]; then cp ~/plow-scripts/hackage-docs.sh scripts/; fi
       - if [[ "$status" == 200 ]]; then stack haddock; fi
       - if [[ "$status" == 200 ]]; then scripts/hackage-docs.sh plow; fi
