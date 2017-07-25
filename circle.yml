@@ -46,11 +46,11 @@ deployment:
            echo Variable \$hackage_password has not been set && exit 2;
           fi
       # Move to directory where the package tarball is and upload to hackage
-      - cd .stack-work/dist/x86_64-linux/Cabal* &&
-           tarball=$(ls -t *.gz | head -1) &&
-           echo Using $tarball as tarball file &&
-           status=$(curl --output /dev/stderr --write-out "%{http_code}" -i -F package=@$tarball https://hackage.plowtech.net/packages/upload -u $hackage_username:$hackage_password) &&
-           echo $status && echo export status=$status >> ~/.bashrc && source ~/.bashrc
+      # - cd .stack-work/dist/x86_64-linux/Cabal* &&
+      #      tarball=$(ls -t *.gz | head -1) &&
+      #      echo Using $tarball as tarball file &&
+      #      status=$(curl --output /dev/stderr --write-out "%{http_code}" -i -F package=@$tarball https://hackage.plowtech.net/packages/upload -u $hackage_username:$hackage_password) &&
+      #      echo $status && echo export status=$status >> ~/.bashrc && source ~/.bashrc
       # Setup Tag Release
       - aws s3 cp --quiet s3://plow-build-tools/tagthis ~/.local/bin/tagthis
       - chmod +x ~/.local/bin/tagthis
