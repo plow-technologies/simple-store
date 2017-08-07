@@ -3,6 +3,8 @@
 # Last Updated 11-04-2016	
 
 Simple-Store
++ 4.0.0
+  Export STM versions of many functions
 + 3.1.0
   use atomic-write to handle file writing
 + 3.0.1
