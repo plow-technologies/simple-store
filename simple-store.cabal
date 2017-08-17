@@ -1,5 +1,5 @@
 Name:                   simple-store
-Version:                3.1.0
+Version:                4.0.0
 Author:                 Kevin Cotrone <kevincotrone@gmail.com>
 Maintainer:             Kevin Cotrone <kevincotrone@gmail.com>
 License:                BSD3
@@ -20,6 +20,7 @@ Library
   Other-Modules:        SimpleStore.Internal
                       , SimpleStore.Types
                       , SimpleStore.IO
+                      , SimpleStore.STM
                       , SimpleStore.FileIO
   Build-Depends:        base >= 4 && < 5
                       , stm >= 2.4.3

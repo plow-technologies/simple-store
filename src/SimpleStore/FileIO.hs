@@ -22,7 +22,6 @@ import qualified Data.ByteString.Char8 as BSC8
 import Data.Text.Encoding (decodeUtf8')
 import Data.Serialize (Serialize, decode, encode)
 import Data.Text (append, Text, pack)
-import qualified Data.Text.IO as Text
 import Data.Traversable (sequence, traverse)
 import Filesystem
        (openFile, IOMode(..), Handle, isDirectory, createDirectory,
@@ -41,10 +40,7 @@ import SimpleStore.Types (StoreError(..), SimpleStore(..))
 import System.IO (hClose, hPrint, stderr)
 import System.IO.Error
        (IOError, isAlreadyInUseError, isDoesNotExistError,
-        isPermissionError, tryIOError)
-import System.Posix.IO (handleToFd, closeFd)
-
-import System.Posix.Unistd (fileSynchronise)
+        isPermissionError)
 
 import System.AtomicWrite.Writer.ByteString
 
@@ -111,25 +107,12 @@ data WithFsync
   = NoFsync
   | Fsync
 
-withFsyncCheck :: WithFsync -> Handle -> IO ()
-withFsyncCheck NoFsync handle' = hClose handle'
-withFsyncCheck Fsync handle' = do
-  fd <- handleToFd handle'
-  eitherE <- tryIOError (fileSynchronise fd)
-  eitherE2 <- tryIOError (closeFd fd)
-  case concatShow <$> eitherE <*> eitherE2 of
-    (Left e) -> putStrLn "withFsyncCheck Failure: " >> print e
-    (Right _) -> return ()
-  where
-    concatShow x y = (show x) ++ (show y)
-
-
 -- | Create a checkpoint for a store. This attempts to write the state to disk
 -- If successful it updates the version, releases the old file handle, and deletes the old file
 checkpoint
   :: (Serialize st)
   => WithFsync -> SimpleStore st -> IO (Either StoreError ())
-checkpoint fsync store = do
+checkpoint _fsync store = do
   !fp <- readTVarIO . storeDir $ store
   !state <- readTVarIO . storeState $ store
   !oldVersion <- readTVarIO tVersion

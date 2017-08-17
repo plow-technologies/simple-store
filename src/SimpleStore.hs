@@ -12,3 +12,10 @@ import           SimpleStore.IO    as SimpleStore (closeSimpleStore,
                                                    attemptOpenDefault,
                                                    putSimpleStore)
 import           SimpleStore.Types as SimpleStore (SimpleStore, StoreError (..))
+
+import           SimpleStore.STM    as SimpleStore   (getSimpleStore',
+                                                      putSimpleStore',
+                                                      modifySimpleStore',
+                                                      modifySimpleStoreResult',
+                                                      modifySimpleStoreResultWith'
+                                                      ) 
