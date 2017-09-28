@@ -59,7 +59,9 @@ openNewestStore f (x:xs) = do
     Left e ->
       putStrLn "errors found and written to errors.log" >>
       (appendFile ("errors-in-" ++ (encodeString . dirname) x ++ ".log") ("filePath:" ++ show x ++ "\n error: " ++ show e)) >>
-      openNewestStore f (Prelude.filter (not . (== x)) xs)
+      case e of
+        err@(StoreIOError _) -> return . Left $ err
+        _otherwise           -> openNewestStore f (Prelude.filter (not . (== x)) xs)
     _ -> return res
   where
     hIOException
@@ -69,7 +71,7 @@ openNewestStore f (x:xs) = do
       -> IO (Either StoreError b)
     hIOException func ys e =
       hPrint stderr e >> openNewestStore func (Prelude.filter (not . (== x)) ys)
-    
+
 
 
 -- Attempt to open a store from a filepath
@@ -183,14 +185,14 @@ readLastTouch dir failoverAction = performRead >>=
   where
     lastTouch = dir </> "last.touch"
     decodeResult               = (>>= first decodeFileError  . decodeUtf8') . first readFileError
-    
+
     evaluateResult (Left  err) = recordError err *> failoverAction
     evaluateResult (Right txt) = return . fromText $ txt
-    
-    recordError     e = appendFile ("errors-in-"++ (encodeString . dirname) lastTouch  ++ ".log") ("filePath:" ++ show  lastTouch  ++ "\n error: " ++ show e)    
+
+    recordError     e = appendFile ("errors-in-"++ (encodeString . dirname) lastTouch  ++ ".log") ("filePath:" ++ show  lastTouch  ++ "\n error: " ++ show e)
     readFileError   e =  "error reading file "         ++ show e
     decodeFileError e =  "error parsing text of file " ++ show e
-    
+
     performRead = do
            let stringFilePath = encodeString lastTouch  :: String -- Create the full filepath for last.touch
            try $ BS.readFile stringFilePath :: IO (Either SomeException BS.ByteString)
