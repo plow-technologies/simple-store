@@ -1,8 +1,11 @@
 # Changelog
 
-# Last Updated 11-04-2016	
+# Last Updated 2017-9-28
 
 Simple-Store
++ 4.1.0
+  Shor-circuit `openNewestStore` to return the correct `StoreError` value when
+  there is deserialization error.
 + 4.0.0
   Export STM versions of many functions
 + 3.1.0
@@ -10,18 +13,18 @@ Simple-Store
 + 3.0.1
   add modifySimpleStoreResultWith
 + 3.0.0
-  removed close store  
+  removed close store
 + 2.1.0
   removed Handle holding
 + 2.0.4
   open.lock functionality removed
   made fsync run inbetweeen var locks to force it better
-	
+
 + 2.0.3
   fsync on checkpoints and locks
   createCheckpointImmediate allows fsync to be called optionally.
   immediate checkpoints always on lock files
-	
+
 + 2.0.2
    better exception handling in opening state store.
    Separated out different try/catch places
@@ -40,7 +43,7 @@ Simple-Store
 + 1.0.0
 	We went down an odd path in 0.3.0 - 0.2.0
 	This restores order
-	
+
 + 0.1.4
   Better filename creation routine
   More strictness in the base types

@@ -48,7 +48,11 @@ import System.AtomicWrite.Writer.ByteString
 -- --------------------------------------------------
 -- API
 -- --------------------------------------------------
--- | Opens the newest store that doesn't throw an exception or give a StoreError back as a result
+
+-- | Opens the newest store that doesn't throw an exception or give a StoreError back as a result.
+-- Attempts to recursively read the second latest touched file if the latest touched file is not found.
+-- For case of corrupted data like serialization error, instead of retrying the next file,
+-- we immediately return with 'StoreIOError'.
 openNewestStore :: (FilePath -> IO (Either StoreError b))
                 -> [FilePath]
                 -> IO (Either StoreError b)
