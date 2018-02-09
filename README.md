@@ -1,4 +1,4 @@
-[![Circle CI](https://circleci.com/gh/plow-technologies/simple-store.svg?style=shield)](https://circleci.com/gh/plow-technologies/simple-store)
+[![Build Status](https://jenkins.plowtech.net/buildStatus/icon?job=simple-store)](https://jenkins.plowtech.net/view/master/job/simple-store/)
 # simple-store
 
 Often in haskell you have a shared data type that needs persistence, atomicity and consistency.
