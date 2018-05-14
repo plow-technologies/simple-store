@@ -13,3 +13,4 @@ cabal.sandbox.config
 /test-states
 .stack-work
 /examples/simple-app/DjangoAddress
+errors-in-test-states.log

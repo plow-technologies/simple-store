@@ -1,8 +1,10 @@
 # Changelog
 
-# Last Updated 11-04-2016	
+# Last Updated 5-14-18
 
 Simple-Store
++ 4.1.0
+  upgrade to ghc 8.2.2, lts-11.7
 + 4.0.0
   Export STM versions of many functions
 + 3.1.0

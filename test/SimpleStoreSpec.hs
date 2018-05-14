@@ -219,7 +219,7 @@ spec = do
     it "Should corrupt a file and then open an older file (with possible wrong state)" $ do
           let dir = "test-states"
           eStore <- openSimpleStore dir :: IO (Either StoreError (SimpleStore (BoundInt)))
-          ex <- getSimpleStore `traverse` eStore
+          _ex <- getSimpleStore `traverse` eStore
           _ <- (flip modifySimpleStore (return . (1 +)) ) `traverse` eStore
           _ <- threadDelay (1 * 10^(6::Integer))
           _ <- createCheckpointImmediate `traverse` eStore

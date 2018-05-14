@@ -1,5 +1,5 @@
 Name:                   simple-store
-Version:                4.0.0
+Version:                4.1.0
 Author:                 Kevin Cotrone <kevincotrone@gmail.com>
 Maintainer:             Kevin Cotrone <kevincotrone@gmail.com>
 License:                BSD3
@@ -15,7 +15,7 @@ Flag                    rebench
 Library
   Default-Language:     Haskell2010
   HS-Source-Dirs:       src
-  GHC-Options:          -Wall
+  GHC-Options:          -Wall -Werror
   Exposed-Modules:      SimpleStore
   Other-Modules:        SimpleStore.Internal
                       , SimpleStore.Types
@@ -40,8 +40,16 @@ Test-Suite spec
   Default-Language:     Haskell2010
   Hs-Source-Dirs:       src
                       , test
-  Ghc-Options:          -Wall
+  Ghc-Options:          -Wall -Werror
   Main-Is:              Spec.hs
+  Other-Modules:        SimpleStore
+                      , SimpleStore.CellSpec
+                      , SimpleStore.FileIO
+                      , SimpleStore.IO
+                      , SimpleStore.Internal
+                      , SimpleStore.STM
+                      , SimpleStore.Types
+                      , SimpleStoreSpec
   Build-Depends:        base
                       , hspec
                       , stm
@@ -63,8 +71,14 @@ Test-Suite mem-spec
   Hs-Source-Dirs:       src
                       , mem-test
                       , test
-  Ghc-Options:          -threaded -Wall  -rtsopts
+  Ghc-Options:          -threaded -Wall -Werror -rtsopts
   Main-Is:              MemSpec.hs
+  Other-Modules:        SimpleStore
+                      , SimpleStore.FileIO
+                      , SimpleStore.IO
+                      , SimpleStore.Internal
+                      , SimpleStore.STM
+                      , SimpleStore.Types
   Build-Depends:        base
                       , hspec
                       , stm
@@ -116,7 +130,7 @@ benchmark simple-store-bench
                       , atomic-write
 
 
-  Ghc-Options:          -threaded -Wall  -rtsopts -prof -auto-all
+  Ghc-Options:          -threaded -Wall -Werror -rtsopts -prof -auto-all
 
 Source-Repository head
   Type:                 git

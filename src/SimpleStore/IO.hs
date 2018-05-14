@@ -32,7 +32,7 @@ import Data.Text hiding (filter, foldl, map, maximum, stripPrefix)
 
 
 import Filesystem
-       (isDirectory, getModified, listDirectory, isFile, writeFile)
+       (isDirectory, getModified, listDirectory, isFile)
 import Filesystem.Path.CurrentOS
        (FilePath, (</>),  fromText)
 import Prelude
