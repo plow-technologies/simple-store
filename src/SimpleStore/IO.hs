@@ -12,6 +12,7 @@ module SimpleStore.IO
   , modifySimpleStore
   , modifySimpleStoreResult
   , modifySimpleStoreResultWith
+  , eitherModifySimpleStoreResultWith
   , makeSimpleStore
   , attemptOpenDefault
   ) where
@@ -36,7 +37,7 @@ import Filesystem
 import Filesystem.Path.CurrentOS
        (FilePath, (</>),  fromText)
 import Prelude
-       (IO, (.), ($), Either(..), (<$>), snd, fst, compare, traverse,
+       (String, IO, (.), ($), Either(..), (<$>), snd, fst, compare, traverse,
         filter, null, pure, last, putStrLn, (++), show, reverse,
         (+), either,otherwise)
 
@@ -172,6 +173,23 @@ modifySimpleStoreResultWith store modifyFunc =
     res@(st', _) <- modifyFunc =<< readTVarIO tState
     atomically $ writeTVar tState st'
     return $ Right res
+  where
+    tState = storeState store
+
+
+-- | Modify a simple store internal value (with a failable IO function)
+--   also return a value computed inside the modify function
+eitherModifySimpleStoreResultWith :: SimpleStore st
+                                  -> (st -> IO (Either String (st, a)))
+                                  -> IO (Either StoreError (st, a))
+eitherModifySimpleStoreResultWith store modifyFunc =
+  withLock store $ do
+    rslt <- modifyFunc =<< readTVarIO tState
+    case rslt of
+      Left err           -> return $ Left $ StoreIOError err
+      Right res@(st', _) -> do
+        atomically $ writeTVar tState st'
+        return $ Right res
   where
     tState = storeState store
 
