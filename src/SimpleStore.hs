@@ -8,6 +8,7 @@ import           SimpleStore.IO    as SimpleStore (closeSimpleStore,
                                                    modifySimpleStore,
                                                    modifySimpleStoreResult,
                                                    modifySimpleStoreResultWith,
+                                                   eitherModifySimpleStoreResultWith,
                                                    openSimpleStore,
                                                    attemptOpenDefault,
                                                    putSimpleStore)
