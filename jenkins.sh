@@ -68,7 +68,7 @@ in simple-store-master)
       echo "case match simple-store-master"
       echo "Update Plowtech Docset"
       stackPath=$(stack path --stack-yaml=global-stack.yaml --dist-dir)
-      haddocset -t ~/docsets/Plowtech.docset add -s "$(stack path --local-pkg-db)"/*.conf;;
+      haddocset -t ~/docsets/Plowtech.docset add -s "$(stack path --stack-yaml=global-stack.yaml --local-pkg-db)"/*.conf;;
 
    *)
       printf "\n"
