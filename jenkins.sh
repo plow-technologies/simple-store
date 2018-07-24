@@ -15,8 +15,6 @@ f () {
     -H "Content-Type: application/json" \
     -X POST \
     -d "{\"state\": \"failure\", \"description\": \"Jenkins\", \"context\": \"continuous-integration/jenkins\", \"target_url\": \"https://jenkins.plowtech.net/job/$JOB_NAME/$BUILD_NUMBER/console\"}" > /dev/null
-    # Sends a post to slack saying this build failed
-    slackpost "${SLACK_URL}" "#brentci" "slackbot" "Build failed for ${GIT_URL}-${GIT_BRANCH}-jenkins"
     # exit the script or return to try again, etc.
     exit $errcode  # or use some other value or do return instead
 }
@@ -26,8 +24,6 @@ curl -s "https://api.github.com/repos/plow-technologies/$REPO/statuses/$GIT_COMM
   -H "Content-Type: application/json" \
   -X POST \
   -d "{\"state\": \"pending\", \"description\": \"Jenkins\", \"context\": \"continuous-integration/jenkins\", \"target_url\": \"https://jenkins.plowtech.net/job/$JOB_NAME/$BUILD_NUMBER/console\"}" > /dev/null
-# This sends a message to slack indicating this build started
-slackpost "${SLACK_URL}" "#brentci" "slackbot" "Build started for ${GIT_URL}-${GIT_BRANCH}-jenkins"
 
 trap f ERR # This command starts a trap for all commands below until the trap is turned off. This trap will run the f function above
 
@@ -71,14 +67,8 @@ in simple-store-master)
       printf "\n"
       echo "case match simple-store-master"
       echo "Update Plowtech Docset"
-      # Make sure stack path is the same as plow-stack path
-      cp global-stack.yaml stack.yaml
-      stackPath=$(stack path --dist-dir)
-      haddocset -t ~/docsets/Plowtech.docset add -s "$(stack path --local-pkg-db)"/*.conf
-      git reset --hard
-      cd ~/docsets
-      tar --exclude='.DS_Store' -czf Plowtech.tgz Plowtech.docset
-      rsync -avzPe ssh ~/docsets/Plowtech.tgz $TESTING_URL:~/docset/;;
+      stackPath=$(stack path --stack-yaml=global-stack.yaml --dist-dir)
+      haddocset -t ~/docsets/Plowtech.docset add -s "$(stack path --local-pkg-db)"/*.conf;;
 
    *)
       printf "\n"
@@ -94,5 +84,3 @@ curl -s "https://api.github.com/repos/plow-technologies/$REPO/statuses/$GIT_COMM
   -H "Content-Type: application/json" \
   -X POST \
   -d "{\"state\": \"success\", \"description\": \"Jenkins\", \"context\": \"continuous-integration/jenkins\", \"target_url\": \"https://jenkins.plowtech.net/job/$JOB_NAME/$BUILD_NUMBER/console\"}" > /dev/null
-# Send successful build message to slack
-slackpost "${SLACK_URL}" "#brentci" "slackbot" "Build successful for ${GIT_URL}-${GIT_BRANCH}-jenkins"
